@@ -26,9 +26,12 @@ services:
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5-5}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      MEDIA_DIR: /data/media
     command: sh -c "alembic upgrade head && python -m app.infrastructure.seed.seed && uvicorn app.api.main:app --host 0.0.0.0 --port 8000"
     ports:
       - "8000:8000"
+    volumes:
+      - media:/data/media
     depends_on:
       db:
         condition: service_healthy
@@ -45,3 +48,4 @@ services:
 
 volumes:
   pgdata:
+  media:

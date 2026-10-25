@@ -1,4 +1,4 @@
-import type { Assessment, CopilotResponse, CopilotStatus, TaskProposal, TaskT, Farm, FieldDetail, FieldSeries, ObsDate, Priorities, RiskSnapshot } from "./types";
+import type { Assessment, CopilotResponse, CopilotStatus, InterventionT, OutcomeDetail, OutcomeListItem, TaskDetail, TaskProposal, TaskStatus, TaskT, Farm, FieldDetail, FieldSeries, ObsDate, Priorities, RiskSnapshot } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -11,6 +11,9 @@ async function get<T>(path: string, init?: RequestInit): Promise<T> {
   }
   return res.json();
 }
+
+const send = <T>(method: string, path: string, body?: unknown) =>
+  get<T>(path, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
 
 export const api = {
   farms: () => get<{ id: number; name: string }[]>("/api/farms"),
@@ -38,6 +41,19 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...t, source }),
     }),
+  tasks: (status?: string) => get<TaskT[]>(`/api/tasks${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+  task: (id: number) => get<TaskDetail>(`/api/tasks/${id}`),
+  setStatus: (id: number, status: TaskStatus) => send<TaskDetail>("PATCH", `/api/tasks/${id}/status`, { status }),
+  inspect: (id: number, body: { findings: string; verified_cause: string | null; notes: string | null; recorded_by: string; photos: string[] }) =>
+    send<TaskDetail>("POST", `/api/tasks/${id}/inspection`, body),
+  verify: (id: number, verified_by: string, notes?: string) => send<TaskDetail>("POST", `/api/tasks/${id}/verify`, { verified_by, notes }),
+  intervene: (body: { field_id: number; inspection_id: number; recommended_action: string | null; approved_action: string; approved_by: string; executed_at: string | null; actual_cost: number; notes: string | null; receituario_confirmado: boolean }) =>
+    send<InterventionT>("POST", "/api/interventions", body),
+  simulate: (interventionId: number) => send<OutcomeDetail>("POST", `/api/interventions/${interventionId}/simulate`),
+  outcomes: () => get<OutcomeListItem[]>("/api/outcomes"),
+  outcome: (id: number) => get<OutcomeDetail>(`/api/outcomes/${id}`),
+  resetDemo: () => send<{ tarefas_removidas: number }>("POST", "/api/demo/reset"),
+  mediaUrl: (path: string) => `${API_URL}${path}`,
   fieldsUrl: (id: number) => `${API_URL}/api/farms/${id}/fields.geojson`,
   cellsUrl: (id: number) => `${API_URL}/api/farms/${id}/cells.geojson`,
 };

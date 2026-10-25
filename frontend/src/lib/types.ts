@@ -30,6 +30,7 @@ export interface ObsDate {
   date: string;
   das: number;
   cloud_pct: number;
+  simulated?: boolean;
   season_id: number;
 }
 
@@ -52,6 +53,7 @@ export interface RiskSnapshot {
   season_id: number;
   season_name: string;
   is_synthetic: boolean;
+  simulated?: boolean;
   source: string;
   method: string;
   thresholds: { yellow: number; red: number };
@@ -199,7 +201,7 @@ export interface FieldDetail {
   season: { id: number; name: string; sowing_date: string; expected_yield_sc_ha: number | null };
   date: string;
   assessment: Assessment;
-  evolution: { date: string; das: number; cloud_pct: number; vermelho: number; amarelo: number; sem_dado: number; ndvi: number | null; baseline: number | null }[];
+  evolution: { date: string; das: number; cloud_pct: number; simulated?: boolean; vermelho: number; amarelo: number; sem_dado: number; ndvi: number | null; baseline: number | null }[];
   weather: { date: string; rain_mm: number; tmax_c: number }[];
   memory: MemoryEvent[];
   harvests: { season: string; expected: number | null; realized: number | null }[];
@@ -240,14 +242,104 @@ export interface CopilotStatus {
   available: Record<string, boolean>;
 }
 
+export type TaskStatus = "pendente" | "atribuída" | "em_andamento" | "concluída" | "verificada";
+
 export interface TaskT {
   id: number;
   field_id: number;
   field_code: string;
   field_name: string;
+  assessment_id: number | null;
   title: string;
-  status: string;
-  priority: string;
+  kind: string;
+  status: TaskStatus;
+  priority: "alta" | "media" | "baixa";
   assignee: string | null;
   due_date: string | null;
+  instructions: string | null;
+  created_at: string;
+  is_synthetic: boolean;
+  has_inspection: boolean;
+  verified_cause: string | null;
+}
+
+export interface InspectionT {
+  id: number;
+  inspected_at: string;
+  findings: string;
+  verified_cause: string | null;
+  photos: string[];
+  notes: string | null;
+  recorded_by: string;
+}
+
+export interface OutcomeT {
+  id: number;
+  intervention_id: number;
+  metric: string;
+  before_start: string;
+  before_end: string;
+  after_start: string;
+  after_end: string;
+  before_value: number;
+  after_value: number;
+  comparison_before: number | null;
+  comparison_after: number | null;
+  delta: number;
+  delta_vs_comparison: number | null;
+  method: string;
+  comparison_area: string | null;
+  limitations: string;
+  confidence: Confidence;
+  is_synthetic: boolean;
+}
+
+export interface InterventionT {
+  id: number;
+  field_id: number;
+  inspection_id: number | null;
+  recommended_action: string | null;
+  approved_action: string;
+  approved_by: string;
+  executed_at: string;
+  actual_cost: number;
+  notes: string | null;
+  is_synthetic: boolean;
+  outcome: OutcomeT | null;
+}
+
+export interface TaskDetail extends TaskT {
+  inspection: InspectionT | null;
+  interventions: InterventionT[];
+  assessment: { id: number; date: string; level: Level; affected_ha: number; observation: string; next_step: string; hypotheses: { cause: string; confidence: Confidence }[] } | null;
+  previous_intervention: { executed_at: string; approved_action: string; actual_cost: number } | null;
+  status_flow: TaskStatus[];
+}
+
+export interface OutcomeListItem extends OutcomeT {
+  field_id: number;
+  field_code: string;
+  field_name: string;
+  executed_at: string;
+  approved_action: string;
+  actual_cost: number;
+  user_created: boolean;
+}
+
+export interface OutcomeDetail {
+  outcome: OutcomeT;
+  field_id: number;
+  field_code: string;
+  field_name: string;
+  farm_id: number;
+  intervention: InterventionT;
+  inspection: InspectionT | null;
+  task: { id: number; title: string } | null;
+  zone_cells: number;
+  comparison_cells: number;
+  zone_cell_ids: number[];
+  series: { date: string; das: number; simulated: boolean; zone: number | null; comparison: number | null }[];
+  before_date: string;
+  after_date: string;
+  disclaimer: string;
 }

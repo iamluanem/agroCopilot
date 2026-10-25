@@ -33,7 +33,7 @@ def test_status_defaults_to_demo(client, monkeypatch):
     ("Quais talhões precisam de atenção hoje?", "get_farm_summary", "T04"),
     ("Por que o Talhão 04 está vermelho?", "get_field_risk", "deficiência hídrica"),
     ("Qual é a perda potencial estimada no T04?", "estimate_economics", "não é perda confirmada"),
-    ("Isso já aconteceu no T04? O que funcionou?", "get_intervention_outcomes", "safra anterior"),
+    ("Isso já aconteceu no T04? O que funcionou?", "get_intervention_outcomes", "safra 2024/25"),
     ("Como a área do T04 evoluiu depois da intervenção?", "get_intervention_outcomes", "ganho líquido"),
 ])
 def test_demo_answers_required_questions(client, monkeypatch, q, tool, needle):
@@ -52,6 +52,7 @@ def test_history_answer_carries_causal_caveat(client):
 
 
 def test_propose_then_confirm_creates_task_and_memory(client):
+    client.post("/api/demo/reset")
     a = ask(client, "Crie uma vistoria para o T04")["answer"]
     t = a["tarefa_proposta"]
     assert t and t["field_code"] == "T04" and t["assessment_id"]
@@ -61,16 +62,10 @@ def test_propose_then_confirm_creates_task_and_memory(client):
     assert r.status_code == 201 and r.json()["status"] == "atribuída"
     after = client.get(f"/api/fields/{t['field_id']}/memory").json()
     try:
-        assert len(after) == len(before) + 1 and after[0]["type"] == "tarefa"
+        new = {m["type"] for m in after}
+        assert len(after) == len(before) + 2 and {"tarefa", "anomalia"} <= new
     finally:  # não deixa lixo de teste na base da demo
-        from sqlalchemy import delete
-
-        from app.infrastructure.db.base import SessionLocal
-        from app.infrastructure.db.models import MemoryEvent, Task
-        with SessionLocal() as s:
-            s.execute(delete(MemoryEvent).where(MemoryEvent.id == after[0]["id"]))
-            s.execute(delete(Task).where(Task.id == r.json()["id"]))
-            s.commit()
+        client.post("/api/demo/reset")
 
 
 def _mock_anthropic(monkeypatch, responses):

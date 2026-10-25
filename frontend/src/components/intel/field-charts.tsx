@@ -10,6 +10,7 @@ const dm = (iso: string) => fmtDate(iso, { day: "2-digit", month: "2-digit" });
 
 export function NdviVsBaselineChart({ d }: { d: FieldDetail }) {
   const data = d.evolution.map((e) => ({ ...e, ndvi: e.cloud_pct > 50 ? null : e.ndvi }));
+  const firstSim = d.evolution.find((e) => e.simulated)?.date;
   return (
     <ResponsiveContainer width="100%" height={220}>
       <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -16 }}>
@@ -18,6 +19,7 @@ export function NdviVsBaselineChart({ d }: { d: FieldDetail }) {
         <YAxis domain={[0.2, 0.95]} tick={AXIS} tickLine={false} axisLine={false} tickFormatter={(v) => fmt(v, 1)} />
         <Tooltip {...TT} labelFormatter={(l) => fmtDate(String(l))} formatter={(v, n) => [fmt(v as number, 3), n]} />
         <Legend wrapperStyle={{ fontSize: 11 }} iconType="plainline" />
+        {firstSim && <ReferenceArea x1={firstSim} x2={d.evolution.at(-1)!.date} fill="#7c3aed" fillOpacity={0.06} label={{ value: "simulado", position: "insideTopRight", fontSize: 10, fill: "#6d28d9" }} />}
         <Line dataKey="baseline" name="Histórico (mesmo DAS)" stroke="#94a3b8" strokeWidth={2} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
         <Line dataKey="ndvi" name={`Safra ${d.season.name}`} stroke="#23824a" strokeWidth={2} dot={{ r: 2.5, strokeWidth: 0, fill: "#23824a" }} connectNulls isAnimationActive={false} />
       </LineChart>

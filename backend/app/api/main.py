@@ -4,9 +4,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routers import copilot, farms, intelligence, tasks
 from app.application.intelligence import warm_cache
+from app.application.operations import MEDIA_DIR
 from app.core.config import get_settings
 
 
@@ -41,6 +43,8 @@ app.include_router(farms.router)
 app.include_router(intelligence.router)
 app.include_router(copilot.router)
 app.include_router(tasks.router)
+MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 
 
 @app.get("/api/health", tags=["infra"])

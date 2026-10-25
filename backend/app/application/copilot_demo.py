@@ -177,8 +177,10 @@ class DemoProvider:
         o = self._tool("get_intervention_outcomes", field=field)
         if "erro" in m:
             return self._error(m["erro"])
-        relevant = [e for e in m["eventos"] if e["type"] in ("anomalia", "vistoria", "intervencao", "resultado", "nota")]
-        done = [i for i in o["intervencoes"] if i["resultado"]]
+        prev_only = lambda e: e.get("season") != o.get("safra_atual")
+        relevant = [e for e in m["eventos"] if e["type"] in ("anomalia", "vistoria", "intervencao", "resultado", "nota")
+                    and prev_only(e)]
+        done = [i for i in o["intervencoes"] if i["resultado"] and i["safra"] != o.get("safra_atual")]
         if not relevant:
             return CopilotAnswer(resumo=f"Não há registro de anomalia, vistoria ou intervenção anterior no {m['talhao']}.",
                                  confianca="alta", proxima_acao="Registrar a vistoria atual para começar a memória do talhão.",
@@ -188,7 +190,7 @@ class DemoProvider:
         if done:
             i = done[0]
             r = i["resultado"]
-            resumo = (f"Sim. Na safra anterior o {m['talhao']} teve anomalia semelhante; a vistoria confirmou a causa e foi feita "
+            resumo = (f"Sim. Na safra {i['safra']} o {m['talhao']} teve anomalia semelhante; a vistoria confirmou a causa e foi feita "
                       f"a intervenção \"{i['acao_aprovada'].split(' no ')[0].lower()}\" (custo {_rs(i['custo_realizado'])}). "
                       f"O NDVI do setor foi de {br(r['antes'], 2)} para {br(r['depois'], 2)}, ganho líquido de "
                       f"{br(r['delta_liquido_vs_comparacao'], 2)} vs. a área de comparação — melhora parcial, com ressalvas.")
@@ -219,8 +221,9 @@ class DemoProvider:
                                  fontes=[Fonte(tipo="resultado", rotulo=f"Intervenções do {o['talhao']}")], alertas=[DEMO_ALERT])
         i = done[0]
         r = i["resultado"]
+        sim = " (observações pós-intervenção simuladas)" if i.get("observacoes_pos_simuladas") else ""
         return CopilotAnswer(
-            resumo=(f"Após a intervenção de {_dm(i['executada_em'])} no {o['talhao']}, o NDVI do setor passou de {br(r['antes'], 2)} "
+            resumo=(f"Após a intervenção de {_dm(i['executada_em'])} no {o['talhao']}{sim}, o NDVI do setor passou de {br(r['antes'], 2)} "
                     f"para {br(r['depois'], 2)}; descontada a área de comparação, ganho líquido de {br(r['delta_liquido_vs_comparacao'], 2)}."),
             evidencias=[f"Método: {r['metodo']}", f"Comparação: {r['area_comparacao']}",
                         f"Área de comparação: {br(r['comparacao_antes'], 2)} → {br(r['comparacao_depois'], 2)}."],

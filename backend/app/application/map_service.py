@@ -90,11 +90,12 @@ def observation_dates(s: Session, farm_id: int, season_id: int | None) -> list[d
     if not season or season.farm_id != farm_id:
         raise NotFound("Safra não encontrada")
     rows = s.execute(text("""
-        SELECT date, das, avg(cloud_flag::int) AS cloud FROM observations
-        WHERE season_id=:s GROUP BY date, das ORDER BY date
+        SELECT date, das, avg(cloud_flag::int) AS cloud, bool_or(source = 'simulacao_pos_intervencao') AS sim
+        FROM observations WHERE season_id=:s GROUP BY date, das ORDER BY date
     """), {"s": season.id}).all()
-    return [dict(date=r.date, das=r.das, cloud_pct=round(float(r.cloud) * 100, 1),
-                 source="Dados de demonstração", season_id=season.id) for r in rows]
+    return [dict(date=r.date, das=r.das, cloud_pct=round(float(r.cloud) * 100, 1), simulated=bool(r.sim),
+                 source="Simulação pós-intervenção (demo)" if r.sim else "Dados de demonstração", season_id=season.id)
+            for r in rows]
 
 
 def risk_snapshot(farm_id: int, on: date) -> dict:
@@ -112,7 +113,7 @@ def _risk_snapshot_cached(farm_id: int, on: date, t: RiskThresholds) -> dict:
     with SessionLocal() as s:
         season = _current_season(s, farm_id, on)
         cur = s.execute(text("""
-            SELECT o.cell_id, c.field_id, c.area_ha, o.ndvi, o.ndre, o.cloud_flag, o.das
+            SELECT o.cell_id, c.field_id, c.area_ha, o.ndvi, o.ndre, o.cloud_flag, o.das, o.source
             FROM observations o JOIN management_cells c ON c.id=o.cell_id
             WHERE o.season_id=:s AND o.date=:d ORDER BY o.cell_id
         """), {"s": season.id, "d": on}).all()
@@ -164,7 +165,8 @@ def _risk_snapshot_cached(farm_id: int, on: date, t: RiskThresholds) -> dict:
     farm_by_level = {lvl: round(float(area[risk.level == i].sum()), 1) for i, lvl in enumerate(LEVELS)}
     return dict(
         date=on, das=das, season_id=season.id, season_name=season.name, is_synthetic=True,
-        source="Dados de demonstração",
+        simulated=cur[0].source == "simulacao_pos_intervencao",
+        source="Simulação pós-intervenção (demo)" if cur[0].source == "simulacao_pos_intervencao" else "Dados de demonstração",
         method="z-score robusto do NDVI vs. histórico da célula no mesmo DAS (descontada a variação geral da "
                f"fazenda) e vs. mediana do talhão; score = -({t.weight_hist:.1f}·z_hist + {1 - t.weight_hist:.1f}·z_talhão). "
                f"Amarelo ≥ {t.yellow}, vermelho ≥ {t.red}. Observações com nuvem descartadas.",

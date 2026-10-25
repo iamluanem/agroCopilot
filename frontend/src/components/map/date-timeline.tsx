@@ -1,5 +1,5 @@
 "use client";
-import { Cloud } from "lucide-react";
+import { Cloud, FlaskConical } from "lucide-react";
 import type { ObsDate } from "@/lib/types";
 import { cn, fmtDate } from "@/lib/utils";
 
@@ -13,7 +13,9 @@ export function DateTimeline({ dates, value, onChange }: { dates: ObsDate[]; val
           <span className="ml-1.5 font-normal text-slate-500">DAS {sel?.das ?? "—"}</span>
         </span>
         <span className="text-[11px] text-slate-500">
-          {sel && sel.cloud_pct > 0 ? (
+          {sel?.simulated ? (
+            <span className="inline-flex items-center gap-1 font-medium text-violet-700"><FlaskConical className="size-3" /> Simulação pós-intervenção (demo)</span>
+          ) : sel && sel.cloud_pct > 0 ? (
             <span className="inline-flex items-center gap-1 text-sky-700"><Cloud className="size-3" /> {sel.cloud_pct.toFixed(0)}% com nuvem — descartado</span>
           ) : "Cena sem nuvem"}
         </span>
@@ -31,11 +33,11 @@ export function DateTimeline({ dates, value, onChange }: { dates: ObsDate[]; val
               onClick={() => onChange(d.date)}
               className="group flex w-5 flex-col items-center gap-1"
             >
-              <span className="h-3">{d.cloud_pct > 5 && <Cloud className="size-3 text-sky-500" />}</span>
+              <span className="h-3">{d.simulated ? <FlaskConical className="size-3 text-violet-500" /> : d.cloud_pct > 5 && <Cloud className="size-3 text-sky-500" />}</span>
               <span
                 className={cn(
                   "h-5 w-1.5 rounded-full transition",
-                  active ? "h-6 w-2 bg-brand-600" : d.cloud_pct > 5 ? "bg-sky-200 group-hover:bg-sky-300" : "bg-slate-300 group-hover:bg-slate-400",
+                  active ? cn("h-6 w-2", d.simulated ? "bg-violet-600" : "bg-brand-600") : d.simulated ? "bg-violet-300 group-hover:bg-violet-400" : d.cloud_pct > 5 ? "bg-sky-200 group-hover:bg-sky-300" : "bg-slate-300 group-hover:bg-slate-400",
                 )}
               />
               <span className={cn("h-3 text-[9px] uppercase text-slate-400", active && "font-semibold text-brand-700")}>

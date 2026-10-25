@@ -11,6 +11,7 @@ import { DemoBadge } from "../ui/demo-badge";
 import { ErrorState, Loading } from "../ui/states";
 import { FieldSeriesChart } from "./field-series-chart";
 import { AssessmentPanel } from "../intel/assessment-cards";
+import { CreateTaskButton } from "../ops/create-task-button";
 
 export interface CellInfo {
   id: number;
@@ -160,7 +161,7 @@ function FieldView({ fieldProps: f, fieldRisk: fr, cell, risk, onBack }: Props &
       <div className="mt-6">
         {assess.isLoading && <Loading label="Analisando zona, hipóteses e exposição…" />}
         {assess.error && <ErrorState error={assess.error} onRetry={() => assess.refetch()} />}
-        {assess.data && <AssessmentPanel a={assess.data} compact />}
+        {assess.data && <AssessmentPanel a={assess.data} compact footer={<CreateTaskButton a={assess.data} />} />}
         <Link href={`/talhoes/${f.id}`} className="mt-4 flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
           Abrir talhão: histórico e memória <ArrowRight className="size-3.5" />
         </Link>

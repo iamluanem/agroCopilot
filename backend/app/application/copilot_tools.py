@@ -184,8 +184,12 @@ def get_intervention_outcomes(ctx: ToolContext, field: str) -> dict:
     rows = ctx.s.execute(select(Intervention, OutcomeMeasurement).outerjoin(
         OutcomeMeasurement, OutcomeMeasurement.intervention_id == Intervention.id,
     ).where(Intervention.field_id == f.id).order_by(Intervention.executed_at.desc())).all()
-    return dict(talhao=f.code, intervencoes=[dict(
-        id=i.id, executada_em=i.executed_at, acao_aprovada=i.approved_action, aprovada_por=i.approved_by,
+    seasons = sorted(ctx.farm.seasons, key=lambda x: x.sowing_date)
+    safra = lambda d: next((x.name for x in reversed(seasons) if x.sowing_date <= d), None)
+    current = next(x.name for x in seasons if x.is_current)
+    return dict(talhao=f.code, safra_atual=current, intervencoes=[dict(
+        id=i.id, safra=safra(i.executed_at), executada_em=i.executed_at, acao_aprovada=i.approved_action,
+        aprovada_por=i.approved_by, observacoes_pos_simuladas=bool(o and not i.is_synthetic),
         custo_realizado=i.actual_cost,
         resultado=dict(metrica=o.metric, antes=o.before_value, depois=o.after_value,
                        comparacao_antes=o.comparison_before, comparacao_depois=o.comparison_after,

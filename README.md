@@ -22,7 +22,7 @@ hipótese (com confiança) e achado verificado em campo, e constrói uma memóri
 | 1 · Fundação | Docker Compose, PostGIS, migrações, seed, tela **Mapa** com talhões e células por risco | ✅ |
 | 2 · Inteligência | Hipóteses com evidência e dado faltante, exposição em R$, priorização, telas **Visão Geral** e **Talhão** | ✅ |
 | 3 · Copiloto | Chat com cards estruturados, 10 ferramentas sobre dados reais, `DemoProvider` + Claude/OpenAI, vistoria com confirmação | ✅ |
-| 4 · Loop operacional | Tarefas, vistoria mobile, intervenção, relatório de resultado, memória | ⏳ |
+| 4 · Loop operacional | **Tarefas** (execução mobile com foto e rascunho offline), verificação do agrônomo, intervenção, simulação pós-intervenção, **Resultados**, memória | ✅ |
 | 5 · Polimento | Configurações, script Sentinel-2, testes, UI para gravação | ⏳ |
 
 ## Como rodar
@@ -51,7 +51,7 @@ Recriar o seed do zero:
 docker compose exec api python -m app.infrastructure.seed.seed --reset
 ```
 
-Testes:
+Testes (atenção: os testes de integração executam `demo/reset` e apagam o que foi criado na demonstração):
 ```bash
 docker compose exec api pytest -q
 ```
@@ -142,6 +142,33 @@ O LLM só acessa dados via ferramentas (`get_farm_summary`, `get_field_risk`, `g
 `get_intervention_outcomes`, `propose_inspection`…) e termina chamando `responder`, validado contra o schema.
 
 Para usar Claude: coloque a chave no `.env` (`ANTHROPIC_API_KEY=...`) e rode `docker compose up -d api`.
+
+### Loop operacional (Fase 4)
+
+`pendente → atribuída → em andamento → vistoria concluída → verificada (agrônomo) → intervenção → resultado`
+
+- A vistoria registra achados, **causa verificada**, até 6 fotos (redimensionadas no aparelho) e fica em rascunho
+  no `localStorage` enquanto é preenchida.
+- Intervenção só é aceita após verificação do agrônomo; ação com produto químico exige confirmar o receituário.
+- **Simular observações pós-intervenção (demo):** gera 3 cenas sintéticas (5, 10 e 15 dias depois), marcadas como
+  `simulacao_pos_intervencao`, e mede o resultado por diferença-em-diferenças contra o restante do talhão.
+- Cada passo vira evento na memória do talhão; o copiloto passa a responder sobre o novo resultado.
+- `POST /api/demo/reset` (ou `docker compose exec api python -c "..."`) remove tudo que foi criado na demonstração.
+
+## Roteiro do vídeo (60–90 s)
+
+1. **Visão Geral** → T04 é a prioridade #1 com exposição em R$.
+2. **Mapa** → células coloridas, troca de datas, opacidade.
+3. Clique numa célula vermelha do T04 → hipóteses, confiança, dado faltante, premissas econômicas.
+4. **Copiloto** (gaveta) → "Por que o Talhão 04 está vermelho?"
+5. → "Isso já aconteceu aqui? O que funcionou?"
+6. Painel do talhão → **Criar vistoria para esta zona**.
+7. Celular (`/tarefas/<id>`) → iniciar, descrever, causa = deficiência hídrica, foto, concluir.
+8. Verificar como agrônomo → registrar intervenção com custo.
+9. **Simular observações pós-intervenção** → relatório de **Resultados** (antes/depois, método, limitações).
+10. **Talhões → T04** → memória com o ciclo novo completo.
+
+Para regravar: `curl -X POST localhost:8000/api/demo/reset` (PowerShell: `Invoke-RestMethod -Method Post localhost:8000/api/demo/reset`).
 
 ### Cenário demo
 

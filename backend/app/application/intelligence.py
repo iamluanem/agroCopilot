@@ -289,11 +289,11 @@ def field_detail(s: Session, field_id: int, on: date | None) -> dict:
         raise NotFound("Talhão não encontrado")
     season = s.scalars(select(CropSeason).where(CropSeason.farm_id == field.farm_id, CropSeason.is_current.is_(True))).one()
     on = on or field.farm.reference_date
-    snaps = _season_snapshots(s, field.farm_id, season.id, until=on)
+    snaps = _season_snapshots(s, field.farm_id, season.id)  # inclui observações simuladas pós-intervenção
     evolution = []
     for sn in snaps:
         f = next(x for x in sn["fields"] if x["field_id"] == field_id)
-        evolution.append(dict(date=sn["date"], das=sn["das"], cloud_pct=f["cloud_pct"],
+        evolution.append(dict(date=sn["date"], das=sn["das"], cloud_pct=f["cloud_pct"], simulated=sn["simulated"],
                               vermelho=f["area_by_level"]["vermelho"], amarelo=f["area_by_level"]["amarelo"],
                               sem_dado=f["area_by_level"]["sem_dado"], ndvi=f["ndvi_mean"], baseline=f["ndvi_baseline"]))
     rain = s.execute(select(WeatherDaily.date, WeatherDaily.rain_mm, WeatherDaily.tmax_c).where(

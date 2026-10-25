@@ -9,8 +9,8 @@ const NAV = [
   { href: "/mapa", label: "Mapa", icon: Map, ready: true },
   { href: "/talhoes", label: "Talhões", icon: Wheat, ready: true },
   { href: "/copiloto", label: "Copiloto", icon: Bot, ready: true },
-  { href: "/tarefas", label: "Tarefas", icon: ClipboardCheck, ready: false },
-  { href: "/resultados", label: "Resultados", icon: LineChart, ready: false },
+  { href: "/tarefas", label: "Tarefas", icon: ClipboardCheck, ready: true },
+  { href: "/resultados", label: "Resultados", icon: LineChart, ready: true },
   { href: "/configuracoes", label: "Configurações", icon: Settings, ready: false },
 ];
 
