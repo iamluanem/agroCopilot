@@ -1,6 +1,7 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ChevronRight, Droplets, Info, Layers, MapPin } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronRight, Droplets, Info, Layers, MapPin } from "lucide-react";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { LEVEL_COLOR, LEVEL_LABEL } from "@/lib/colors";
 import type { Farm, FieldProps, FieldRisk, Level, RiskSnapshot } from "@/lib/types";
@@ -9,6 +10,7 @@ import { Badge } from "../ui/badge";
 import { DemoBadge } from "../ui/demo-badge";
 import { ErrorState, Loading } from "../ui/states";
 import { FieldSeriesChart } from "./field-series-chart";
+import { AssessmentPanel } from "../intel/assessment-cards";
 
 export interface CellInfo {
   id: number;
@@ -124,6 +126,11 @@ function FarmView({ farm, risk, riskLoading, onSelectField }: Props) {
 
 function FieldView({ fieldProps: f, fieldRisk: fr, cell, risk, onBack }: Props & { fieldProps: FieldProps }) {
   const series = useQuery({ queryKey: ["series", f.id], queryFn: () => api.fieldSeries(f.id) });
+  const assess = useQuery({
+    queryKey: ["assessment", f.id, risk?.date],
+    queryFn: () => api.assessment(f.id, risk!.date),
+    enabled: !!risk,
+  });
   return (
     <div className="p-5">
       <button onClick={onBack} className="mb-3 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800">
@@ -149,6 +156,15 @@ function FieldView({ fieldProps: f, fieldRisk: fr, cell, risk, onBack }: Props &
           <div className="mt-3"><LevelBar byLevel={fr.area_by_level} total={fr.area_ha} /></div>
         </div>
       )}
+
+      <div className="mt-6">
+        {assess.isLoading && <Loading label="Analisando zona, hipóteses e exposição…" />}
+        {assess.error && <ErrorState error={assess.error} onRetry={() => assess.refetch()} />}
+        {assess.data && <AssessmentPanel a={assess.data} compact />}
+        <Link href={`/talhoes/${f.id}`} className="mt-4 flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
+          Abrir talhão: histórico e memória <ArrowRight className="size-3.5" />
+        </Link>
+      </div>
 
       <h3 className="mb-1 mt-6 text-[11px] font-semibold uppercase tracking-wide text-slate-500">NDVI médio do talhão por safra</h3>
       {series.isLoading && <Loading />}
@@ -189,6 +205,9 @@ function CellCard({ cell, risk, fieldName }: { cell: CellInfo; risk: RiskSnapsho
         <Metric label="Confiança" value={cell.confidence ?? "—"} />
       </div>
       <p className="mt-3 text-xs leading-relaxed text-slate-600"><span className="font-medium text-slate-800">Por que essa cor? </span>{why}</p>
+      {(cell.level === "vermelho" || cell.level === "amarelo") && (
+        <p className="mt-2 text-[11px] font-medium text-slate-700">Esta célula faz parte da zona em anomalia do talhão. Hipóteses e exposição abaixo.</p>
+      )}
       <p className="mt-2 text-[11px] text-slate-500">
         {fieldName} · {fmt(cell.area_ha, 2)} ha · {fmtDate(risk.date)} · Sinal para direcionar vistoria, não diagnóstico.
       </p>

@@ -2,6 +2,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { LEVEL_COLOR } from "@/lib/colors";
@@ -39,7 +40,8 @@ export function MapWorkspace() {
   const [basemap, setBasemap] = useState<Basemap>("satelite");
   const [opacity, setOpacity] = useState(0.8);
   const [hidden, setHidden] = useState<number[]>([]);
-  const [selField, setSelField] = useState<number | null>(null);
+  const params = useSearchParams();
+  const [selField, setSelField] = useState<number | null>(() => Number(params.get("talhao")) || null);
   const [selCell, setSelCell] = useState<number | null>(null);
 
   useEffect(() => {

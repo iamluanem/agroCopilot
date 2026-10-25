@@ -240,7 +240,9 @@ export function FarmMap(p: Props) {
     }
     if (p.selectedCellId != null || lastFlown.current === p.selectedFieldId) return;
     const f = p.fields.features.find((x) => x.properties.id === p.selectedFieldId);
-    if (f) map.fitBounds(fieldBounds(f), { padding: { top: 100, bottom: 130, left: 60, right: 60 }, duration: 900 });
+    const fly = () => f && map.fitBounds(fieldBounds(f), { padding: { top: 100, bottom: 130, left: 60, right: 60 }, duration: 900 });
+    if (map.loaded()) fly();
+    else map.once("load", fly);
     lastFlown.current = p.selectedFieldId;
   }, [p.selectedFieldId, p.selectedCellId, p.fields, p.bbox]);
 

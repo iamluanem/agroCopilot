@@ -107,7 +107,7 @@ def clear_cache() -> None:
     _risk_snapshot_cached.cache_clear()
 
 
-@lru_cache(maxsize=64)
+@lru_cache(maxsize=160)
 def _risk_snapshot_cached(farm_id: int, on: date, t: RiskThresholds) -> dict:
     with SessionLocal() as s:
         season = _current_season(s, farm_id, on)

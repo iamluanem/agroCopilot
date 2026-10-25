@@ -13,17 +13,17 @@ hipótese (com confiança) e achado verificado em campo, e constrói uma memóri
 > **sintéticos e determinísticos**. Não representam medições reais de satélite nem operações reais de campo.
 > Todo registro sintético tem `is_synthetic = true` e é sinalizado na interface.
 
-![Talhão 04 — setor sudoeste do pivô em vermelho](docs/screenshots/fase1-talhao04.jpg)
+![Visão Geral — prioridades por exposição em R$](docs/screenshots/fase2-visao-geral.jpg)
 
 ## Status
 
 | Fase | Escopo | Status |
 |---|---|---|
 | 1 · Fundação | Docker Compose, PostGIS, migrações, seed, tela **Mapa** com talhões e células por risco | ✅ |
-| 2 · Inteligência | Hipóteses, modelo econômico (R$), painel da célula, tela Talhão | ⏳ |
+| 2 · Inteligência | Hipóteses com evidência e dado faltante, exposição em R$, priorização, telas **Visão Geral** e **Talhão** | ✅ |
 | 3 · Copiloto | Abstração de LLM, `DemoProvider`, ferramentas, cards estruturados | ⏳ |
 | 4 · Loop operacional | Tarefas, vistoria mobile, intervenção, relatório de resultado, memória | ⏳ |
-| 5 · Polimento | Visão Geral, Configurações, script Sentinel-2, testes, UI para gravação | ⏳ |
+| 5 · Polimento | Configurações, script Sentinel-2, testes, UI para gravação | ⏳ |
 
 ## Como rodar
 
@@ -111,6 +111,19 @@ Para cada célula de manejo de 30 × 30 m, numa data de observação:
 - `score = −(0,6·z_hist + 0,4·z_talhão)`. Atenção ≥ 1,5; crítico ≥ 2,5 (configurável);
 - confiança: concordância entre as duas referências + existência de histórico + observações válidas recentes;
 - observações com nuvem são descartadas (célula fica "sem dado").
+
+### Hipóteses e economia (Fase 2)
+
+Para cada talhão em atenção/crítico, a **zona** (células amarelas + vermelhas) é materializada em `risk_assessments`
+com hipóteses e estimativa econômica — o mesmo registro que tarefas e copiloto vão referenciar.
+
+- **Hipóteses por regras** (`domain/hypotheses.py`): deficiência hídrica, pragas/doenças, nutricional e falha de estande,
+  pontuadas por contexto — sequência de dias sem chuva, textura do solo, padrão espacial (setor contíguo, faixa linear,
+  manchas), início da anomalia no ciclo, recorrência e vistorias anteriores. Cada uma lista **evidências** (inclusive
+  contra) e o **dado que falta**. Sem vistoria, nenhuma passa de confiança *moderada*.
+- **Exposição** (`domain/economics.py`): `área afetada × sc/ha × R$/sc × faixa de perda`, com área afetada = crítica +
+  50% da atenção. Mostrada como faixa, com premissas visíveis. Nunca apresentada como perda ou economia realizada.
+- **Prioridade** = exposição média × urgência (estádio fenológico + tendência) × peso da confiança.
 
 ### Cenário demo
 

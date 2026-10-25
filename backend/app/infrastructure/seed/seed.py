@@ -10,6 +10,7 @@ from sqlalchemy import delete, select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.fmt import br
 from app.infrastructure.db.base import SessionLocal, engine
 from app.infrastructure.db.models import (
     AppSetting, CropSeason, Farm, Field, Inspection, Intervention, ManagementCell, MemoryEvent,
@@ -18,6 +19,7 @@ from app.infrastructure.db.models import (
 from app.infrastructure.seed import scenario as sc
 
 FARM_NAME = "Fazenda Santa Aurora"
+SEED_VERSION = 3  # incremente ao mudar o cenário: o seed recria a demo automaticamente
 
 DEFAULT_SETTINGS = {
     "economia": {
@@ -43,6 +45,10 @@ def seed(reset: bool = False) -> None:
     t0 = time.time()
     with SessionLocal() as s:
         existing = s.scalar(select(Farm).where(Farm.name == FARM_NAME))
+        ver = s.get(AppSetting, "seed_version")
+        if existing and (not ver or ver.value.get("valor") != SEED_VERSION):
+            print(f"Cenário demo mudou (versão {SEED_VERSION}). Recriando…")
+            reset = True
         if existing and not reset:
             print(f"Seed já aplicado (farm id={existing.id}). Use --reset para recriar.")
             return
@@ -132,8 +138,10 @@ def _seed(s: Session) -> None:
 
     _seed_history(s, farm, fields, seasons, grid, obs_sets, meta)
 
+    s.merge(AppSetting(key="seed_version", value={"valor": SEED_VERSION}))
     for k, v in DEFAULT_SETTINGS.items():
-        s.merge(AppSetting(key=k, value=v if isinstance(v, dict) else {"valor": v}))
+        if not s.get(AppSetting, k):  # preserva configurações editadas pelo usuário
+            s.add(AppSetting(key=k, value=v if isinstance(v, dict) else {"valor": v}))
     s.commit()
     s.execute(text("ANALYZE observations"))
     s.commit()
@@ -218,19 +226,19 @@ def _seed_history(s, farm, fields, seasons, grid, obs_sets, meta) -> None:
     s.add_all([
         ev(t04, prev, prev.sowing_date, "safra", "Semeadura safra 2024/25", "Soja semeada no pivô central."),
         ev(t04, prev, d(a["onset"] + 8), "anomalia", "Queda de NDVI no setor sudoeste do pivô",
-           f"NDVI abaixo do histórico da própria área e da mediana do talhão em ~{affected_ha:.0f} ha, "
+           f"NDVI abaixo do histórico da própria área e da mediana do talhão em ~{br(affected_ha, 0)} ha, "
            "após 12 dias sem chuva.", {"area_ha": affected_ha}),
         ev(t04, prev, insp.inspected_at, "vistoria", "Vistoria confirmou deficiência hídrica",
            insp.findings, {"task_id": task.id, "inspection_id": insp.id}),
         ev(t04, prev, interv.executed_at, "intervencao", "Ajuste de emissores e lâmina do pivô",
-           f"{interv.approved_action} Custo realizado: R$ {interv.actual_cost:,.2f}.".replace(",", "X").replace(".", ",").replace("X", "."),
+           f"{interv.approved_action} Custo realizado: R$ {br(interv.actual_cost, 2)}.",
            {"intervention_id": interv.id}),
         ev(t04, prev, d(at), "resultado", "NDVI do setor recuperou parcialmente",
-           f"NDVI do setor: {b:.2f} → {af_v:.2f}; área de comparação: {cb:.2f} → {ca:.2f}. "
-           f"Diferença líquida {outcome.delta_vs_comparison:+.2f}. Chuvas também retornaram no período — "
+           f"NDVI do setor: {br(b, 2)} → {br(af_v, 2)}; área de comparação: {br(cb, 2)} → {br(ca, 2)}. "
+           f"Diferença líquida {"+" if outcome.delta_vs_comparison >= 0 else "−"}{br(abs(outcome.delta_vs_comparison), 2)}. Chuvas também retornaram no período — "
            "associação, não prova causal.", {"intervention_id": interv.id}),
         ev(t04, prev, prev.harvest_date, "safra", "Colheita safra 2024/25",
-           f"Produtividade média do talhão: {prev.realized_yield_sc_ha:.1f} sc/ha (esperado {prev.expected_yield_sc_ha:.0f})."),
+           f"Produtividade média do talhão: {br(prev.realized_yield_sc_ha, 1)} sc/ha (esperado {br(prev.expected_yield_sc_ha, 0)})."),
     ])
     for f in fields:
         for season in seasons:

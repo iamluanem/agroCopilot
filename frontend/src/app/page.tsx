@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { Overview } from "@/components/intel/overview";
 
 export default function Home() {
-  redirect("/mapa");
+  return <Overview />;
 }

@@ -209,7 +209,10 @@ def generate_weather() -> list[tuple[date, float, float, float]]:
         d = start
         while d <= end:
             in_dry = s.name in dry and dry[s.name][0] <= d <= dry[s.name][1]
-            if in_dry:
+            edge = s.name in dry and d in (dry[s.name][0] - timedelta(days=1), dry[s.name][1] + timedelta(days=1))
+            if edge:
+                rain, tmax = float(rng.uniform(12, 28)), rng.uniform(28.5, 30.5)
+            elif in_dry:
                 rain, tmax = 0.0, rng.uniform(34.0, 36.5)
             else:
                 rain = float(rng.gamma(1.4, 11.0)) if rng.random() < 0.55 else 0.0
