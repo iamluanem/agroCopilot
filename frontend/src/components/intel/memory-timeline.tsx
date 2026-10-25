@@ -1,5 +1,5 @@
 "use client";
-import { AlertTriangle, ClipboardCheck, LineChart, NotebookPen, Search, Sprout, Wrench } from "lucide-react";
+import { AlertTriangle, ClipboardCheck, ClipboardPlus, LineChart, NotebookPen, Search, Sprout, Wrench } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { MemoryEvent } from "@/lib/types";
 import { cn, fmtDate } from "@/lib/utils";
@@ -12,6 +12,7 @@ const TYPE = {
   intervencao: { icon: Wrench, label: "Intervenção", cls: "bg-violet-50 text-violet-700" },
   resultado: { icon: LineChart, label: "Resultado", cls: "bg-emerald-50 text-emerald-700" },
   nota: { icon: NotebookPen, label: "Nota de campo", cls: "bg-amber-50 text-amber-700" },
+  tarefa: { icon: ClipboardPlus, label: "Tarefa", cls: "bg-brand-50 text-brand-700" },
 } as const;
 
 export function MemoryTimeline({ events }: { events: MemoryEvent[] }) {

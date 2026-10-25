@@ -181,7 +181,7 @@ export interface Priorities {
 export interface MemoryEvent {
   id: number;
   date: string;
-  type: "safra" | "anomalia" | "vistoria" | "intervencao" | "resultado" | "nota";
+  type: "safra" | "anomalia" | "vistoria" | "intervencao" | "resultado" | "nota" | "tarefa";
   title: string;
   summary: string;
   season: string | null;
@@ -203,4 +203,51 @@ export interface FieldDetail {
   weather: { date: string; rain_mm: number; tmax_c: number }[];
   memory: MemoryEvent[];
   harvests: { season: string; expected: number | null; realized: number | null }[];
+}
+
+export interface TaskProposal {
+  field_id: number;
+  field_code: string;
+  assessment_id: number | null;
+  title: string;
+  priority: "alta" | "media" | "baixa";
+  assignee: string | null;
+  due_date: string | null;
+  instructions: string;
+}
+
+export interface CopilotAnswer {
+  resumo: string;
+  evidencias: string[];
+  confianca: Confidence;
+  dados_faltantes: string[];
+  proxima_acao: string;
+  fontes: { tipo: string; rotulo: string; ref: string | null }[];
+  tarefa_proposta: TaskProposal | null;
+  alertas: string[];
+}
+
+export interface CopilotResponse {
+  answer: CopilotAnswer;
+  provider: string;
+  tools_used: { name: string; args: Record<string, unknown> }[];
+}
+
+export interface CopilotStatus {
+  provider: string;
+  label: string;
+  suggestions: string[];
+  available: Record<string, boolean>;
+}
+
+export interface TaskT {
+  id: number;
+  field_id: number;
+  field_code: string;
+  field_name: string;
+  title: string;
+  status: string;
+  priority: string;
+  assignee: string | null;
+  due_date: string | null;
 }

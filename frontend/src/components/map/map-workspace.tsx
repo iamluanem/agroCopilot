@@ -1,6 +1,6 @@
 "use client";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Bot, Loader2, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { LEVEL_COLOR } from "@/lib/colors";
 import type { Basemap, FieldProps, Level, LayerMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { CopilotChat } from "../copilot/chat";
 import { DemoBadge } from "../ui/demo-badge";
 import { Segmented } from "../ui/segmented";
 import { Slider } from "../ui/slider";
@@ -43,6 +44,7 @@ export function MapWorkspace() {
   const params = useSearchParams();
   const [selField, setSelField] = useState<number | null>(() => Number(params.get("talhao")) || null);
   const [selCell, setSelCell] = useState<number | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     if (farm.data && seasonId == null) setSeasonId(farm.data.seasons.find((s) => s.is_current)?.id ?? farm.data.seasons.at(-1)!.id);
@@ -129,6 +131,9 @@ export function MapWorkspace() {
             {risk.isFetching && <Loader2 className="mr-1 size-3.5 animate-spin text-slate-400" />}
           </div>
           <div className="pointer-events-auto flex items-center gap-1.5 rounded-xl bg-white/95 p-1.5 shadow-lg ring-1 ring-slate-900/5 backdrop-blur">
+            <button onClick={() => setChatOpen((v) => !v)} className={cn("mr-1 inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold transition", chatOpen ? "bg-navy-900 text-white" : "bg-brand-600 text-white hover:bg-brand-700")}>
+              <Bot className="size-3.5" /> Copiloto
+            </button>
             {farm.data.fields.map((f) => {
               const on = !hidden.includes(f.id);
               const lvl = risk.data?.fields.find((x) => x.field_id === f.id)?.level;
@@ -151,6 +156,17 @@ export function MapWorkspace() {
           <DemoBadge className="pointer-events-auto self-start bg-white shadow" label="Dados de demonstração" />
           <div className="pointer-events-auto"><MapLegend mode={mode} /></div>
         </div>
+        {(
+          <div className={cn("absolute inset-y-3 right-3 z-10 w-[420px] max-w-[calc(100%-1.5rem)]", chatOpen ? "flex" : "hidden")}>
+          <div className="flex w-full flex-col overflow-hidden rounded-xl bg-slate-50 shadow-2xl ring-1 ring-slate-900/10">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2.5">
+              <div className="flex items-center gap-2 text-sm font-semibold"><Bot className="size-4 text-brand-600" /> Copiloto{fieldProps ? <span className="text-xs font-normal text-slate-500">· contexto {fieldProps.code}</span> : null}</div>
+              <button onClick={() => setChatOpen(false)} aria-label="Fechar copiloto" className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="size-4" /></button>
+            </div>
+            <div className="min-h-0 flex-1"><CopilotChat compact source="mapa" fieldId={selField} fieldCode={fieldProps?.code} /></div>
+          </div>
+          </div>
+        )}
         {dates.data && (
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
             <DateTimeline dates={dates.data} value={date} onChange={(d) => setDate(d)} />

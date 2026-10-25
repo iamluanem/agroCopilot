@@ -21,7 +21,7 @@ hipótese (com confiança) e achado verificado em campo, e constrói uma memóri
 |---|---|---|
 | 1 · Fundação | Docker Compose, PostGIS, migrações, seed, tela **Mapa** com talhões e células por risco | ✅ |
 | 2 · Inteligência | Hipóteses com evidência e dado faltante, exposição em R$, priorização, telas **Visão Geral** e **Talhão** | ✅ |
-| 3 · Copiloto | Abstração de LLM, `DemoProvider`, ferramentas, cards estruturados | ⏳ |
+| 3 · Copiloto | Chat com cards estruturados, 10 ferramentas sobre dados reais, `DemoProvider` + Claude/OpenAI, vistoria com confirmação | ✅ |
 | 4 · Loop operacional | Tarefas, vistoria mobile, intervenção, relatório de resultado, memória | ⏳ |
 | 5 · Polimento | Configurações, script Sentinel-2, testes, UI para gravação | ⏳ |
 
@@ -124,6 +124,24 @@ com hipóteses e estimativa econômica — o mesmo registro que tarefas e copilo
 - **Exposição** (`domain/economics.py`): `área afetada × sc/ha × R$/sc × faixa de perda`, com área afetada = crítica +
   50% da atenção. Mostrada como faixa, com premissas visíveis. Nunca apresentada como perda ou economia realizada.
 - **Prioridade** = exposição média × urgência (estádio fenológico + tendência) × peso da confiança.
+
+### Copiloto (Fase 3)
+
+Página **Copiloto** e gaveta no **Mapa** (com o talhão selecionado como contexto). Toda resposta segue o schema
+`CopilotAnswer` (Pydantic): `resumo`, `evidencias`, `confianca`, `dados_faltantes`, `proxima_acao`, `fontes`,
+`alertas` e, opcionalmente, `tarefa_proposta` — que só vira tarefa quando o usuário confirma.
+
+| Provedor | Quando é usado |
+|---|---|
+| `DemoProvider` | Padrão sem chave. Regras determinísticas sobre as **mesmas ferramentas** — ideal para gravar a demo |
+| Claude | `ANTHROPIC_API_KEY` definida (modelo em `ANTHROPIC_MODEL`) |
+| OpenAI | `OPENAI_API_KEY` definida (modelo em `OPENAI_MODEL`) |
+
+`LLM_PROVIDER=auto|demo|anthropic|openai` força a escolha. Se o LLM falhar, a resposta cai para o modo demo com aviso.
+O LLM só acessa dados via ferramentas (`get_farm_summary`, `get_field_risk`, `get_memory`, `estimate_economics`,
+`get_intervention_outcomes`, `propose_inspection`…) e termina chamando `responder`, validado contra o schema.
+
+Para usar Claude: coloque a chave no `.env` (`ANTHROPIC_API_KEY=...`) e rode `docker compose up -d api`.
 
 ### Cenário demo
 

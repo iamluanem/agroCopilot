@@ -8,7 +8,7 @@ const NAV = [
   { href: "/", label: "Visão Geral", icon: LayoutDashboard, ready: true },
   { href: "/mapa", label: "Mapa", icon: Map, ready: true },
   { href: "/talhoes", label: "Talhões", icon: Wheat, ready: true },
-  { href: "/copiloto", label: "Copiloto", icon: Bot, ready: false },
+  { href: "/copiloto", label: "Copiloto", icon: Bot, ready: true },
   { href: "/tarefas", label: "Tarefas", icon: ClipboardCheck, ready: false },
   { href: "/resultados", label: "Resultados", icon: LineChart, ready: false },
   { href: "/configuracoes", label: "Configurações", icon: Settings, ready: false },

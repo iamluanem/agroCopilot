@@ -19,7 +19,7 @@ from app.infrastructure.db.models import (
 from app.infrastructure.seed import scenario as sc
 
 FARM_NAME = "Fazenda Santa Aurora"
-SEED_VERSION = 3  # incremente ao mudar o cenário: o seed recria a demo automaticamente
+SEED_VERSION = 4  # incremente ao mudar o cenário: o seed recria a demo automaticamente
 
 DEFAULT_SETTINGS = {
     "economia": {
@@ -32,7 +32,7 @@ DEFAULT_SETTINGS = {
     },
     "risco": {"limiar_amarelo": 1.5, "limiar_vermelho": 2.5, "peso_historico": 0.6},
     "fonte_dados": "demo",
-    "llm_provider": "demo",
+    "llm_provider": "auto",  # auto = usa a chave disponível (Anthropic/OpenAI) ou o DemoProvider
 }
 
 
@@ -46,6 +46,10 @@ def seed(reset: bool = False) -> None:
     with SessionLocal() as s:
         existing = s.scalar(select(Farm).where(Farm.name == FARM_NAME))
         ver = s.get(AppSetting, "seed_version")
+        prov = s.get(AppSetting, "llm_provider")
+        if prov and prov.value.get("valor") == "demo" and (not ver or ver.value.get("valor", 0) < 4):
+            prov.value = {"valor": "auto"}  # migração: o padrão antigo travava o copiloto no modo demo
+            s.commit()
         if existing and (not ver or ver.value.get("valor") != SEED_VERSION):
             print(f"Cenário demo mudou (versão {SEED_VERSION}). Recriando…")
             reset = True

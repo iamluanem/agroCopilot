@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from app.api.routers import farms, intelligence
+from app.api.routers import copilot, farms, intelligence, tasks
 from app.application.intelligence import warm_cache
 from app.core.config import get_settings
 
@@ -39,6 +39,8 @@ app.add_middleware(
 )
 app.include_router(farms.router)
 app.include_router(intelligence.router)
+app.include_router(copilot.router)
+app.include_router(tasks.router)
 
 
 @app.get("/api/health", tags=["infra"])
