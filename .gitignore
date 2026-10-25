@@ -1,0 +1,14 @@
+.env
+.DS_Store
+# python
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+# node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+*.tar.gz
