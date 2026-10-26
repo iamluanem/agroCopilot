@@ -4,10 +4,10 @@ from fastapi import APIRouter
 
 from app.application.operations import MEDIA_DIR
 
-router = APIRouter(prefix="/api", tags=["imagens"])
+router = APIRouter(prefix="/api", tags=["imagery"])
 
 
-@router.get("/farms/{farm_id}/imagery", summary="Cenas Sentinel-2 reais processadas (scripts/fetch_sentinel.py)")
+@router.get("/farms/{farm_id}/imagery", summary="Processed real Sentinel-2 scenes (scripts/fetch_sentinel.py)")
 def imagery(farm_id: int):
     out = []
     for f in sorted((MEDIA_DIR / "sentinel").glob("*.json")):

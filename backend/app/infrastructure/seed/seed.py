@@ -1,4 +1,4 @@
-"""Seed idempotente da demo. Uso: python -m app.infrastructure.seed.seed [--reset]"""
+"""Idempotent demo seed. Usage: python -m app.infrastructure.seed.seed [--reset]"""
 import io
 import sys
 import time
@@ -10,7 +10,7 @@ from sqlalchemy import delete, select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.fmt import br
+from app.core.fmt import num
 from app.infrastructure.db.base import SessionLocal, engine
 from app.infrastructure.db.models import (
     AppSetting, CropSeason, Farm, Field, Inspection, Intervention, ManagementCell, MemoryEvent,
@@ -18,21 +18,21 @@ from app.infrastructure.db.models import (
 )
 from app.infrastructure.seed import scenario as sc
 
-FARM_NAME = "Fazenda Santa Aurora"
-SEED_VERSION = 4  # incremente ao mudar o cenário: o seed recria a demo automaticamente
+FARM_NAME = "Santa Aurora Farm"
+SEED_VERSION = 5  # bump when the scenario changes: the seed rebuilds the demo automatically
+SETTINGS_SCHEMA = 5  # v5: English keys (older Portuguese keys are dropped and recreated)
 
 DEFAULT_SETTINGS = {
-    "economia": {
-        "produtividade_esperada_sc_ha": 62.0,
-        "preco_saca_rs": 120.0,
-        "perda_min_pct": 8.0,
-        "perda_max_pct": 25.0,
-        "custo_vistoria_rs": 450.0,
-        "custo_intervencao_rs_ha": 85.0,
+    "economics": {
+        "expected_yield_bags_ha": 62.0,
+        "bag_price_brl": 120.0,
+        "loss_min_pct": 8.0,
+        "loss_max_pct": 25.0,
+        "inspection_cost_brl": 450.0,
+        "intervention_cost_brl_ha": 85.0,
     },
-    "risco": {"limiar_amarelo": 1.5, "limiar_vermelho": 2.5, "peso_historico": 0.6},
-    "fonte_dados": "demo",
-    "llm_provider": "auto",  # auto = usa a chave disponível (Anthropic/OpenAI) ou o DemoProvider
+    "risk": {"yellow_threshold": 1.5, "red_threshold": 2.5, "history_weight": 0.6},
+    "llm_provider": "auto",  # auto = use whichever key is available (Anthropic/OpenAI) or the DemoProvider
 }
 
 
@@ -44,23 +44,23 @@ def _wkt(g, nd=7) -> str:
 def seed(reset: bool = False) -> None:
     t0 = time.time()
     with SessionLocal() as s:
-        existing = s.scalar(select(Farm).where(Farm.name == FARM_NAME))
+        existing = s.scalar(select(Farm).order_by(Farm.id))
         ver = s.get(AppSetting, "seed_version")
-        prov = s.get(AppSetting, "llm_provider")
-        if prov and prov.value.get("valor") == "demo" and (not ver or ver.value.get("valor", 0) < 4):
-            prov.value = {"valor": "auto"}  # migração: o padrão antigo travava o copiloto no modo demo
+        version = (ver.value.get("value", ver.value.get("valor")) if ver else None)
+        if version is None or version < SETTINGS_SCHEMA:
+            s.execute(delete(AppSetting))  # settings from the Portuguese version → recreate with English keys
             s.commit()
-        if existing and (not ver or ver.value.get("valor") != SEED_VERSION):
-            print(f"Cenário demo mudou (versão {SEED_VERSION}). Recriando…")
+        if existing and version != SEED_VERSION:
+            print(f"Demo scenario changed (version {SEED_VERSION}). Rebuilding…")
             reset = True
         if existing and not reset:
-            print(f"Seed já aplicado (farm id={existing.id}). Use --reset para recriar.")
+            print(f"Seed already applied (farm id={existing.id}). Use --reset to rebuild.")
             return
         if existing:
-            s.execute(delete(Farm).where(Farm.id == existing.id))  # cascata no banco
+            s.execute(delete(Farm))  # cascades in the database
             s.commit()
         _seed(s)
-    print(f"Seed concluído em {time.time() - t0:.1f}s")
+    print(f"Seed finished in {time.time() - t0:.1f}s")
 
 
 def _seed(s: Session) -> None:
@@ -75,10 +75,10 @@ def _seed(s: Session) -> None:
     ref_date = sc.das_dates(current)[-1][1]
 
     farm = Farm(
-        name=FARM_NAME, municipality="Sorriso", state="MT", crop="Soja", area_ha=round(total_ha, 1),
+        name=FARM_NAME, municipality="Sorriso", state="MT", crop="Soybean", area_ha=round(total_ha, 1),
         reference_date=ref_date, is_synthetic=True,
-        soil_notes="Predomínio de Latossolo Vermelho-Amarelo argiloso; setor sudoeste do T04 com textura "
-                   "média a arenosa e menor retenção de água. (Dados de demonstração)",
+        soil_notes="Mostly clayey Red-Yellow Oxisol; the southwest sector of F04 has a medium-to-sandy texture "
+                   "and lower water-holding capacity. (Demo data)",
         boundary=f"SRID=4326;{_wkt(farm_boundary)}",
     )
     s.add(farm)
@@ -87,8 +87,8 @@ def _seed(s: Session) -> None:
     seasons = []
     for spec in sc.SEASONS:
         cs = CropSeason(
-            farm_id=farm.id, name=spec.name, crop="Soja", sowing_date=spec.sowing, harvest_date=spec.harvest,
-            expected_yield_sc_ha=spec.expected_yield, realized_yield_sc_ha=spec.realized_yield,
+            farm_id=farm.id, name=spec.name, crop="Soybean", sowing_date=spec.sowing, harvest_date=spec.harvest,
+            expected_yield_bags_ha=spec.expected_yield, realized_yield_bags_ha=spec.realized_yield,
             is_current=spec.is_current,
         )
         s.add(cs)
@@ -97,16 +97,16 @@ def _seed(s: Session) -> None:
     fields = []
     for i, (spec, g) in enumerate(zip(specs, fields_wgs)):
         f = Field(
-            farm_id=farm.id, code=spec["code"], name=f"Talhão {spec['code'][1:]}",
+            farm_id=farm.id, code=spec["code"], name=f"Field {spec['code'][1:]}",
             area_ha=round(float(grid.area_ha[grid.field_idx == i].sum()), 1),
-            soil_texture=spec["soil"], irrigation=spec["irrigation"], boundary_source="demo_sintetico",
+            soil_texture=spec["soil"], irrigation=spec["irrigation"], boundary_source="synthetic_demo",
             geom=f"SRID=4326;{_wkt(g)}",
         )
         s.add(f)
         fields.append(f)
     s.flush()
 
-    # células
+    # cells
     cell_rows = [
         dict(field_id=fields[fi].id, row=int(r), col=int(c), area_ha=round(float(a), 4),
              geom=f"SRID=4326;{_wkt(sc.to_wgs(g))}")
@@ -120,7 +120,7 @@ def _seed(s: Session) -> None:
     ).all())
     assert cell_ids.size == grid.cx.size
 
-    # observações via COPY
+    # observations via COPY
     buf = io.StringIO()
     for o in obs_sets:
         sid = seasons[o.season_idx].id
@@ -134,7 +134,7 @@ def _seed(s: Session) -> None:
         while chunk := buf.read(1 << 20):
             cp.write(chunk)
 
-    # clima
+    # weather
     s.execute(text(
         "INSERT INTO weather_daily (farm_id, date, rain_mm, tmax_c, tmin_c, is_synthetic) "
         "VALUES (:f, :d, :r, :tx, :tn, true)"
@@ -142,18 +142,18 @@ def _seed(s: Session) -> None:
 
     _seed_history(s, farm, fields, seasons, grid, obs_sets, meta)
 
-    s.merge(AppSetting(key="seed_version", value={"valor": SEED_VERSION}))
+    s.merge(AppSetting(key="seed_version", value={"value": SEED_VERSION}))
     for k, v in DEFAULT_SETTINGS.items():
-        if not s.get(AppSetting, k):  # preserva configurações editadas pelo usuário
-            s.add(AppSetting(key=k, value=v if isinstance(v, dict) else {"valor": v}))
+        if not s.get(AppSetting, k):  # keep settings the user has edited
+            s.add(AppSetting(key=k, value=v if isinstance(v, dict) else {"value": v}))
     s.commit()
     s.execute(text("ANALYZE observations"))
     s.commit()
 
 
 def _seed_history(s, farm, fields, seasons, grid, obs_sets, meta) -> None:
-    """Ciclo completo da safra 2024/25 no T04 + eventos de memória dos demais talhões."""
-    t04 = fields[3]
+    """Full 2024/25 cycle on F04 + memory events for the other fields."""
+    f04 = fields[3]
     prev = seasons[1]
     a = sc.PREV_ANOMALY
     sector = meta["sector"]
@@ -173,33 +173,33 @@ def _seed_history(s, farm, fields, seasons, grid, obs_sets, meta) -> None:
     sector_wkt = f"SRID=4326;{_wkt(sector_geom)}"
 
     task = Task(
-        farm_id=farm.id, field_id=t04.id, title="Vistoria — setor sudoeste do pivô (T04)", kind="vistoria",
-        priority="alta", assignee="Carlos Menezes (técnico de campo)", due_date=d(a["peak"] + 1),
-        instructions="Percorrer o setor sudoeste do pivô. Verificar sintomas de déficit hídrico (murcha nas horas "
-                     "quentes), batida de pano para percevejos e lagartas, e funcionamento dos emissores das "
-                     "últimas torres.",
-        status="verificada", geom=sector_wkt,
+        farm_id=farm.id, field_id=f04.id, title="Inspection — southwest sector of the pivot (F04)", kind="inspection",
+        priority="high", assignee="Carlos Menezes (field technician)", due_date=d(a["peak"] + 1),
+        instructions="Walk the southwest sector of the pivot. Check for water-stress symptoms (midday wilting), "
+                     "run beat-sheet sampling for stink bugs and caterpillars, and check the sprinklers on the last "
+                     "towers.",
+        status="verified", geom=sector_wkt,
     )
     s.add(task)
     s.flush()
     insp = Inspection(
         task_id=task.id, inspected_at=d(a["peak"] + 2), recorded_by="Carlos Menezes",
-        verified_cause="Deficiência hídrica",
-        findings="Plantas com murcha nas horas quentes e folíolos virados no setor sudoeste. Emissores entupidos "
-                 "nas duas últimas torres do pivô. Batida de pano abaixo do nível de ação para percevejos.",
-        notes="Solo de textura mais arenosa nesse setor. Recomendado revisar emissores e lâmina aplicada.",
+        verified_cause="Water stress",
+        findings="Plants wilting at midday and leaflets flipped in the southwest sector. Clogged sprinklers on the "
+                 "last two towers of the pivot. Beat-sheet counts below the stink-bug action threshold.",
+        notes="Sandier soil in this sector. Recommended reviewing sprinklers and applied irrigation depth.",
         photos=[],
     )
     s.add(insp)
     s.flush()
     interv = Intervention(
-        field_id=t04.id, inspection_id=insp.id,
-        recommended_action="Revisar emissores das torres finais e ajustar lâmina de irrigação no setor afetado.",
-        approved_action="Limpeza/troca de emissores das torres 7 e 8 e aumento da lâmina para 8 mm/dia no "
-                        "setor sudoeste durante 10 dias.",
-        approved_by="Eng. Agr. Mariana Rocha (CREA-MT)", executed_at=d(a["intervention_das"]),
+        field_id=f04.id, inspection_id=insp.id,
+        recommended_action="Review the sprinklers on the last towers and adjust irrigation depth in the affected sector.",
+        approved_action="Cleaned/replaced sprinklers on towers 7 and 8 and raised irrigation depth to 8 mm/day in "
+                        "the southwest sector for 10 days.",
+        approved_by="Mariana Rocha, agronomist (CREA-MT)", executed_at=d(a["intervention_das"]),
         actual_cost=round(affected_ha * 92.0, 2),
-        notes="Custos incluem mão de obra, peças e energia adicional estimada. (Dados de demonstração)",
+        notes="Costs include labor, parts and estimated extra energy. (Demo data)",
     )
     s.add(interv)
     s.flush()
@@ -214,46 +214,47 @@ def _seed_history(s, farm, fields, seasons, grid, obs_sets, meta) -> None:
         before_value=round(b, 3), after_value=round(af_v, 3),
         comparison_before=round(cb, 3), comparison_after=round(ca, 3),
         delta=round(af_v - b, 3), delta_vs_comparison=round((af_v - b) - (ca - cb), 3),
-        method="Diferença-em-diferenças simples: variação do NDVI médio do setor afetado entre as janelas antes "
-               "e depois, descontada a variação no restante do pivô (área de comparação) no mesmo período. "
-               "Observações com nuvem descartadas.",
-        comparison_area="Restante do T04 (mesmo pivô, mesma cultivar e data de semeadura), fora do setor sudoeste.",
-        limitations="Houve retorno das chuvas no mesmo período, o que também contribui para a recuperação. "
-                    "Apenas um evento; sem parcela-controle sem intervenção. Indica associação, não prova causal.",
-        confidence="moderada",
+        method="Simple difference-in-differences: change in the mean NDVI of the affected sector between the "
+               "before and after windows, net of the change in the rest of the pivot (comparison area) over the "
+               "same period. Cloudy observations discarded.",
+        comparison_area="Rest of F04 (same pivot, cultivar and sowing date), outside the southwest sector.",
+        limitations="Rain returned during the same period, which also contributes to the recovery. Single event; "
+                    "no untreated control plot. Indicates association, not proof of causation.",
+        confidence="moderate",
     )
     s.add(outcome)
 
     ev = lambda f, season, date_, typ, title, summary, refs=None: MemoryEvent(
         field_id=f.id, season_id=season.id, date=date_, type=typ, title=title, summary=summary, refs=refs or {},
     )
+    sign = "+" if outcome.delta_vs_comparison >= 0 else "−"
     s.add_all([
-        ev(t04, prev, prev.sowing_date, "safra", "Semeadura safra 2024/25", "Soja semeada no pivô central."),
-        ev(t04, prev, d(a["onset"] + 8), "anomalia", "Queda de NDVI no setor sudoeste do pivô",
-           f"NDVI abaixo do histórico da própria área e da mediana do talhão em ~{br(affected_ha, 0)} ha, "
-           "após 12 dias sem chuva.", {"area_ha": affected_ha}),
-        ev(t04, prev, insp.inspected_at, "vistoria", "Vistoria confirmou deficiência hídrica",
+        ev(f04, prev, prev.sowing_date, "season", "2024/25 season sowing", "Soybean sown under the center pivot."),
+        ev(f04, prev, d(a["onset"] + 8), "anomaly", "NDVI drop in the southwest sector of the pivot",
+           f"NDVI below the area's own history and the field median across ~{num(affected_ha, 0)} ha, "
+           "after 12 days without rain.", {"area_ha": affected_ha}),
+        ev(f04, prev, insp.inspected_at, "inspection", "Inspection confirmed water stress",
            insp.findings, {"task_id": task.id, "inspection_id": insp.id}),
-        ev(t04, prev, interv.executed_at, "intervencao", "Ajuste de emissores e lâmina do pivô",
-           f"{interv.approved_action} Custo realizado: R$ {br(interv.actual_cost, 2)}.",
+        ev(f04, prev, interv.executed_at, "intervention", "Pivot sprinkler and irrigation-depth fix",
+           f"{interv.approved_action} Actual cost: R$ {num(interv.actual_cost, 2)}.",
            {"intervention_id": interv.id}),
-        ev(t04, prev, d(at), "resultado", "NDVI do setor recuperou parcialmente",
-           f"NDVI do setor: {br(b, 2)} → {br(af_v, 2)}; área de comparação: {br(cb, 2)} → {br(ca, 2)}. "
-           f"Diferença líquida {"+" if outcome.delta_vs_comparison >= 0 else "−"}{br(abs(outcome.delta_vs_comparison), 2)}. Chuvas também retornaram no período — "
-           "associação, não prova causal.", {"intervention_id": interv.id}),
-        ev(t04, prev, prev.harvest_date, "safra", "Colheita safra 2024/25",
-           f"Produtividade média do talhão: {br(prev.realized_yield_sc_ha, 1)} sc/ha (esperado {br(prev.expected_yield_sc_ha, 0)})."),
+        ev(f04, prev, d(at), "outcome", "Sector NDVI partially recovered",
+           f"Sector NDVI: {num(b, 2)} → {num(af_v, 2)}; comparison area: {num(cb, 2)} → {num(ca, 2)}. "
+           f"Net difference {sign}{num(abs(outcome.delta_vs_comparison), 2)}. Rain also returned in the period — "
+           "association, not proof of causation.", {"intervention_id": interv.id}),
+        ev(f04, prev, prev.harvest_date, "season", "2024/25 season harvest",
+           f"Field average yield: {num(prev.realized_yield_bags_ha, 1)} bags/ha "
+           f"(expected {num(prev.expected_yield_bags_ha, 0)})."),
     ])
     for f in fields:
         for season in seasons:
-            if f is t04 and season is prev:
+            if f is f04 and season is prev:
                 continue
-            s.add(ev(f, season, season.sowing_date, "safra", f"Semeadura safra {season.name}",
-                     f"Soja semeada em {f.name}."))
-    s.add(ev(fields[2], seasons[2], seasons[2].sowing_date + timedelta(days=21), "nota",
-             "Estande irregular observado na emergência",
-             "Operador relatou falhas de plantio em faixa diagonal do talhão (possível problema na semeadora)."))
-
+            s.add(ev(f, season, season.sowing_date, "season", f"{season.name} season sowing",
+                     f"Soybean sown in {f.name}."))
+    s.add(ev(fields[2], seasons[2], seasons[2].sowing_date + timedelta(days=21), "note",
+             "Uneven stand observed at emergence",
+             "Operator reported planting skips in a diagonal strip across the field (possible planter problem)."))
 
 if __name__ == "__main__":
     seed(reset="--reset" in sys.argv)

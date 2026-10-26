@@ -25,7 +25,7 @@ function rampColor(v: number | null | undefined): string {
   return r[r.length - 1][1];
 }
 
-export function FieldNdviSvg({ farmId, fieldId, date, zoneIds, title, mode = "risco" }: { farmId: number; fieldId: number; date: string; zoneIds: number[]; title: string; mode?: "risco" | "ndvi" }) {
+export function FieldNdviSvg({ farmId, fieldId, date, zoneIds, title, mode = "risk" }: { farmId: number; fieldId: number; date: string; zoneIds: number[]; title: string; mode?: "risk" | "ndvi" }) {
   const cells = useQuery({
     queryKey: ["cells", farmId],
     staleTime: Infinity,
@@ -47,8 +47,8 @@ export function FieldNdviSvg({ farmId, fieldId, date, zoneIds, title, mode = "ri
     const paths = feats.map((f) => {
       const d = f.geometry.coordinates[0].map(([x, y], i) => `${i ? "L" : "M"}${((x - x0) * kx * s).toFixed(1)},${((y1 - y) * s).toFixed(1)}`).join("") + "Z";
       const i = idx.get(Number(f.id));
-      const lvl = i != null ? risk.data.levels[risk.data.cells.level[i]] : "sem_dado";
-      const fill = mode === "risco" ? LEVEL_COLOR[lvl] : rampColor(i != null ? risk.data.cells.ndvi[i] : null);
+      const lvl = i != null ? risk.data.levels[risk.data.cells.level[i]] : "no_data";
+      const fill = mode === "risk" ? LEVEL_COLOR[lvl] : rampColor(i != null ? risk.data.cells.ndvi[i] : null);
       return { id: Number(f.id), d, fill, zone: zone.has(Number(f.id)) };
     });
     return { W, H, paths };
@@ -58,18 +58,18 @@ export function FieldNdviSvg({ farmId, fieldId, date, zoneIds, title, mode = "ri
     <figure className="rounded-xl border border-slate-200 bg-white p-3">
       <figcaption className="mb-2 flex items-center justify-between text-xs">
         <span className="font-semibold text-slate-800">{title}</span>
-        <span className="text-slate-500">{fmtDate(date)}{risk.data?.simulated ? " · simulado" : ""}</span>
+        <span className="text-slate-500">{fmtDate(date)}{risk.data?.simulated ? " · simulated" : ""}</span>
       </figcaption>
       {risk.data && (
         <div className="mb-2 flex gap-3 text-[11px] text-slate-600">
-          {(["vermelho", "amarelo"] as Level[]).map((l) => {
+          {(["red", "yellow"] as Level[]).map((l) => {
             const ha = risk.data.fields.find((f) => f.field_id === fieldId)?.area_by_level[l] ?? 0;
-            return <span key={l} className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: LEVEL_COLOR[l] }} />{LEVEL_LABEL[l]} {ha.toFixed(1).replace(".", ",")} ha</span>;
+            return <span key={l} className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: LEVEL_COLOR[l] }} />{LEVEL_LABEL[l]} {ha.toFixed(1)} ha</span>;
           })}
         </div>
       )}
-      {!drawing ? <div className="grid aspect-square place-items-center text-xs text-slate-400">Carregando…</div> : (
-        <svg viewBox={`0 0 ${drawing.W} ${drawing.H}`} className="w-full" role="img" aria-label={`Mapa de ${mode === "risco" ? "risco" : "NDVI"} do talhão em ${fmtDate(date)}`}>
+      {!drawing ? <div className="grid aspect-square place-items-center text-xs text-slate-400">Loading…</div> : (
+        <svg viewBox={`0 0 ${drawing.W} ${drawing.H}`} className="w-full" role="img" aria-label={`Field ${mode === "risk" ? "risk" : "NDVI"} map on ${fmtDate(date)}`}>
           {drawing.paths.map((p) => <path key={p.id} d={p.d} fill={p.fill} stroke={p.fill} strokeWidth={0.4} />)}
           <g fill="none" stroke="#0a1120" strokeWidth={0.6} strokeOpacity={0.35}>
             {drawing.paths.filter((p) => p.zone).map((p) => <path key={p.id} d={p.d} />)}
@@ -83,10 +83,10 @@ export function FieldNdviSvg({ farmId, fieldId, date, zoneIds, title, mode = "ri
 export function NdviLegend() {
   return (
     <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-500">
-      {(["vermelho", "amarelo", "verde"] as Level[]).map((l) => (
+      {(["red", "yellow", "green"] as Level[]).map((l) => (
         <span key={l} className="inline-flex items-center gap-1"><span className="size-2.5 rounded-sm" style={{ background: LEVEL_COLOR[l] }} />{LEVEL_LABEL[l]}</span>
       ))}
-      <span>· risco relativo ao histórico do mesmo estádio e à mediana do talhão (desconta a senescência) · contorno = zona tratada</span>
+      <span>· risk relative to history at the same stage and to the field median (discounts senescence) · outline = treated zone</span>
     </div>
   );
 }

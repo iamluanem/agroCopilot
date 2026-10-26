@@ -1,4 +1,4 @@
-"""Pipeline do Sentinel-2 com bandas sintéticas locais (sem rede): reprojeção, scale/offset, máscara SCL e PNGs."""
+"""Sentinel-2 pipeline with local synthetic bands (no network): reprojection, scale/offset, SCL mask and PNGs."""
 import importlib.util
 import json
 from pathlib import Path
@@ -28,7 +28,7 @@ def _band(path: Path, data: np.ndarray, res: float):
 def scene(tmp_path):
     n10, n20 = 1100, 550
     yy, xx = np.mgrid[0:n10, 0:n10]
-    stress = (xx < 350)  # faixa oeste com vegetação mais fraca
+    stress = (xx < 350)  # western strip with weaker vegetation
     red = np.where(stress, 2000, 1300).astype("uint16")       # DN com offset de 1000 (baseline ≥ 04.00)
     nir = np.where(stress, 3800, 5200).astype("uint16")
     re1 = np.full((n20, n20), 1900, "uint16")
@@ -48,7 +48,7 @@ def test_process_generates_layers_and_metadata(scene):
     assert (tmp / "out" / "S2_TEST_ndvi.png").exists() and (tmp / "out" / "S2_TEST_ndre.png").exists()
     meta = json.loads((tmp / "out" / "S2_TEST.json").read_text())
     assert meta["files"]["ndvi"] == "/media/sentinel/S2_TEST_ndvi.png" and meta["is_synthetic"] is False
-    # offset −0,1 aplicado: NDVI saudável = (0,42−0,03)/(0,42+0,03) ≈ 0,87
+    # −0.1 offset applied: healthy NDVI = (0.42−0.03)/(0.42+0.03) ≈ 0.87
     assert 0.6 < meta["ndvi_mean"] < 0.9
     assert 0 < meta["valid_pct"] < 100  # nuvem mascarada pelo SCL e borda sem dado
 

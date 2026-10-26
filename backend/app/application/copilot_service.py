@@ -9,21 +9,21 @@ from app.domain.copilot import CopilotRequest, CopilotResponse
 from app.infrastructure.db.models import AppSetting, Farm
 
 SUGGESTIONS = [
-    "Quais talhões precisam de atenção hoje?",
-    "Por que o Talhão 04 está vermelho?",
-    "Qual é a perda potencial estimada?",
-    "Isso já aconteceu nesse talhão? O que funcionou?",
-    "Como a área evoluiu depois da intervenção?",
-    "Crie uma vistoria para o T04",
+    "Which fields need attention today?",
+    "Why is Field 04 red?",
+    "What is the estimated potential loss?",
+    "Has this happened in this field before? What worked?",
+    "How did the area evolve after the intervention?",
+    "Create an inspection for F04",
 ]
 
 
 def _choose(s: Session):
-    """Ordem: LLM_PROVIDER (env) > Configurações (app_settings) > auto (chave disponível) > demo."""
+    """Order: LLM_PROVIDER (env) > Settings (app_settings) > auto (available key) > demo."""
     from app.infrastructure.llm.providers import AnthropicProvider, OpenAIProvider
     row = s.get(AppSetting, "llm_provider")
     env = os.getenv("LLM_PROVIDER", "auto")
-    wanted = env if env != "auto" else ((row.value.get("valor") if row else None) or "auto")
+    wanted = env if env != "auto" else ((row.value.get("value") if row else None) or "auto")
     available = {"anthropic": bool(os.getenv("ANTHROPIC_API_KEY")), "openai": bool(os.getenv("OPENAI_API_KEY"))}
     if wanted in ("auto", None):
         wanted = next((k for k, ok in available.items() if ok), "demo")
@@ -44,17 +44,17 @@ def status(s: Session) -> dict:
 def ask(s: Session, req: CopilotRequest) -> CopilotResponse:
     farm = s.scalars(select(Farm).order_by(Farm.id)).first()
     if not farm:
-        raise LookupError("Nenhuma fazenda cadastrada")
+        raise LookupError("No farm registered")
     ctx = ToolContext(s=s, farm=farm)
     provider = _choose(s)
     try:
         answer, calls = provider.answer(req, ctx)
         name = provider.label
-    except Exception as e:  # falha do LLM não derruba o copiloto: cai para o modo determinístico
+    except Exception as e:  # an LLM failure never breaks the copilot: fall back to deterministic mode
         demo = DemoProvider()
         answer, calls = demo.answer(req, ctx)
-        answer.alertas.insert(0, f"{provider.label} indisponível ({str(e)[:120]}). Resposta gerada pelo modo demo.")
+        answer.warnings.insert(0, f"{provider.label} unavailable ({str(e)[:120]}). Answer generated in demo mode.")
         name = demo.label
-    if not any("sintétic" in a for a in answer.alertas):
-        answer.alertas.append("Dados de demonstração (sintéticos).")
+    if not any("synthetic" in a.lower() for a in answer.warnings):
+        answer.warnings.append("Demo data (synthetic).")
     return CopilotResponse(answer=answer, provider=name, tools_used=calls)

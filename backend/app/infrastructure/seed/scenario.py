@@ -1,7 +1,7 @@
-"""Cenário de demonstração determinístico — Fazenda Santa Aurora (Sorriso-MT).
+"""Deterministic demo scenario — Santa Aurora Farm (Sorriso, Mato Grosso, Brazil).
 
-Tudo aqui é SINTÉTICO: limites dos talhões, NDVI/NDRE, clima e histórico operacional.
-Nenhum valor representa medição real de satélite ou operação real de campo.
+Everything here is SYNTHETIC: field boundaries, NDVI/NDRE, weather and operational history.
+No value represents a real satellite measurement or a real field operation.
 """
 from dataclasses import dataclass, field
 from datetime import date, timedelta
@@ -11,7 +11,7 @@ from pyproj import Transformer
 from shapely import affinity, box, intersection, Point, Polygon
 from shapely.ops import transform as shp_transform
 
-ORIGIN_LONLAT = (-55.872, -12.612)  # canto SO da fazenda (sintético), oeste de Sorriso-MT
+ORIGIN_LONLAT = (-55.872, -12.612)  # SW corner of the farm (synthetic), west of Sorriso-MT
 UTM = "EPSG:32721"
 RNG_SEED = 20251006
 
@@ -26,7 +26,7 @@ class SeasonSpec:
     sowing: date
     harvest: date | None
     last_das: int
-    offset: float               # efeito geral da safra no NDVI
+    offset: float               # season-wide NDVI effect
     cloud_das: tuple[int, ...]
     expected_yield: float
     realized_yield: float | None
@@ -41,7 +41,7 @@ SEASONS = (
 OBS_STEP_DAYS = 5
 FIRST_DAS = 10
 
-# Anomalia no setor sudoeste do pivô (T04)
+# Anomaly in the southwest sector of the pivot (F04)
 PIVOT_CENTER = (900.0, 760.0)
 PIVOT_RADIUS = 700.0
 PREV_ANOMALY = dict(onset=62, peak=75, intervention_das=81, depth=0.16, residual=0.35)
@@ -52,7 +52,7 @@ def das_dates(season: SeasonSpec) -> list[tuple[int, date]]:
     return [(d, season.sowing + timedelta(days=d)) for d in range(FIRST_DAS, season.last_das + 1, OBS_STEP_DAYS)]
 
 
-# ---------------------------------------------------------------- geometria (metros, UTM local)
+# ---------------------------------------------------------------- geometry (meters, local UTM)
 def _field_shapes() -> list[dict]:
     t01 = Polygon([(0, 1600), (1700, 1600), (1700, 3140), (380, 3140), (0, 2780)])
     t02 = box(1730, 1600, 3430, 3140)
@@ -60,11 +60,11 @@ def _field_shapes() -> list[dict]:
     t04 = Point(PIVOT_CENTER).buffer(PIVOT_RADIUS, quad_segs=32)
     t05 = Polygon([(1730, 0), (3430, 0), (3430, 1570), (2050, 1570), (2050, 1330), (1730, 1330)])
     return [
-        dict(code="T01", geom=t01, soil="Latossolo Vermelho-Amarelo argiloso", irrigation="sequeiro"),
-        dict(code="T02", geom=t02, soil="Latossolo Vermelho-Amarelo argiloso", irrigation="sequeiro"),
-        dict(code="T03", geom=t03, soil="Latossolo Vermelho-Amarelo médio", irrigation="sequeiro"),
-        dict(code="T04", geom=t04, soil="Latossolo textura média a arenosa (setor SO)", irrigation="pivô central"),
-        dict(code="T05", geom=t05, soil="Latossolo Vermelho-Amarelo argiloso", irrigation="sequeiro"),
+        dict(code="F01", geom=t01, soil="Red-Yellow Oxisol, clayey", irrigation="rainfed"),
+        dict(code="F02", geom=t02, soil="Red-Yellow Oxisol, clayey", irrigation="rainfed"),
+        dict(code="F03", geom=t03, soil="Red-Yellow Oxisol, loamy", irrigation="rainfed"),
+        dict(code="F04", geom=t04, soil="Oxisol, medium-to-sandy texture (SW sector)", irrigation="center pivot"),
+        dict(code="F05", geom=t05, soil="Red-Yellow Oxisol, clayey", irrigation="rainfed"),
     ]
 
 
@@ -80,7 +80,7 @@ class CellGrid:
     cx: np.ndarray
     cy: np.ndarray
     area_ha: np.ndarray
-    geoms: list = field(default_factory=list)  # shapely em metros locais
+    geoms: list = field(default_factory=list)  # shapely, local meters
 
 
 def build_grid(fields: list[dict], cell_m: int) -> CellGrid:
@@ -106,7 +106,7 @@ def build_grid(fields: list[dict], cell_m: int) -> CellGrid:
     return CellGrid(np.array(fi), np.array(rows), np.array(cols), np.array(cxs), np.array(cys), np.array(areas), geoms)
 
 
-# ---------------------------------------------------------------- campos espaciais suaves
+# ---------------------------------------------------------------- smooth spatial fields
 def _smooth_field(rng: np.random.Generator, x, y, n=7, amp=0.012, wl=(250, 900)):
     out = np.zeros_like(x, dtype=float)
     for _ in range(n):
@@ -125,7 +125,7 @@ def ndvi_curve(das):
 
 
 def sector_membership(grid: CellGrid, rng: np.random.Generator) -> np.ndarray:
-    """Pertinência (0–1) ao setor sudoeste do pivô, com bordas irregulares."""
+    """Membership (0–1) in the pivot's southwest sector, with irregular edges."""
     dx, dy = grid.cx - PIVOT_CENTER[0], grid.cy - PIVOT_CENTER[1]
     r = np.hypot(dx, dy)
     ang = np.degrees(np.arctan2(dy, dx)) % 360
@@ -138,7 +138,7 @@ def sector_membership(grid: CellGrid, rng: np.random.Generator) -> np.ndarray:
 
 
 def t03_strip(grid: CellGrid) -> np.ndarray:
-    """Faixa com desenvolvimento desuniforme no T03 (falha de estande na semeadura)."""
+    """Strip with uneven development in F03 (stand failure at planting)."""
     d = np.abs((grid.cx - 3460) * 0.45 - (grid.cy - 1600) + 420) / np.hypot(0.45, 1)
     return np.clip((130 - d) / 60, 0, 1) * (grid.field_idx == 2)
 
@@ -155,7 +155,7 @@ class ObservationSet:
 
 def generate_observations(grid: CellGrid) -> tuple[list[ObservationSet], dict]:
     rng = np.random.default_rng(RNG_SEED)
-    soil = _smooth_field(rng, grid.cx, grid.cy)                      # produtividade persistente
+    soil = _smooth_field(rng, grid.cx, grid.cy)                      # persistent productivity
     sector = sector_membership(grid, rng)
     strip = t03_strip(grid)
     near_hq = np.clip((260 - np.hypot(grid.cx - 1890, grid.cy - 1450)) / 200, 0, 1) * (grid.field_idx == 4)
@@ -171,7 +171,7 @@ def generate_observations(grid: CellGrid) -> tuple[list[ObservationSet], dict]:
                 if das >= CURR_ANOMALY["onset"]:
                     k = min(1.0, (das - CURR_ANOMALY["onset"]) / (CURR_ANOMALY["peak"] - CURR_ANOMALY["onset"]))
                     v -= CURR_ANOMALY["depth"] * k * sector
-                    v -= 0.015 * k  # veranico afeta levemente toda a fazenda
+                    v -= 0.015 * k  # the dry spell slightly affects the whole farm
             if s.name == "2024/25":
                 a = PREV_ANOMALY
                 if a["onset"] <= das < a["intervention_das"]:
@@ -195,7 +195,7 @@ def generate_observations(grid: CellGrid) -> tuple[list[ObservationSet], dict]:
     return sets, {"sector": sector, "strip": strip}
 
 
-# ---------------------------------------------------------------- clima diário sintético
+# ---------------------------------------------------------------- synthetic daily weather
 def generate_weather() -> list[tuple[date, float, float, float]]:
     rng = np.random.default_rng(RNG_SEED + 1)
     out = []

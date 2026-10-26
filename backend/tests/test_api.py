@@ -1,10 +1,10 @@
-"""Testes de integração — exigem PostGIS com seed aplicado (DATABASE_URL)."""
+"""Integration tests — require PostGIS with the seed applied (DATABASE_URL)."""
 import os
 
 import pytest
 from fastapi.testclient import TestClient
 
-pytestmark = pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL não definido")
+pytestmark = pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set")
 
 
 @pytest.fixture(scope="module")
@@ -20,7 +20,7 @@ def test_map_endpoints(client):
     dates = client.get(f"/api/farms/{farm['id']}/dates").json()
     assert dates[-1]["date"] == detail["reference_date"]
     risk = client.get(f"/api/farms/{farm['id']}/risk", params={"on": detail["reference_date"]}).json()
-    assert risk["fields"][0]["code"] == "T04" and risk["fields"][0]["level"] == "vermelho"
+    assert risk["fields"][0]["code"] == "F04" and risk["fields"][0]["level"] == "red"
     assert len(risk["cells"]["id"]) == len(risk["cells"]["level"]) > 10000
     fc = client.get(f"/api/farms/{farm['id']}/fields.geojson").json()
     assert len(fc["features"]) == 5
@@ -35,20 +35,20 @@ def test_priorities_rank_t04_first_with_exposure(client):
     farm = client.get("/api/farms").json()[0]
     p = client.get(f"/api/farms/{farm['id']}/priorities").json()
     top = p["items"][0]
-    assert top["code"] == "T04" and top["rank"] == 1
+    assert top["code"] == "F04" and top["rank"] == 1
     assert 0 < top["economics"]["exposure_min"] < top["economics"]["exposure_max"]
-    assert top["hypotheses"][0]["cause"] == "Deficiência hídrica"
+    assert top["hypotheses"][0]["cause"] == "Water stress"
     assert all(h["missing"] for h in top["hypotheses"])
-    t03 = next(i for i in p["items"] if i["code"] == "T03")
-    assert t03["hypotheses"][0]["cause"].startswith("Falha de estande")
-    assert not next(i for i in p["items"] if i["code"] == "T01")["has_zone"]
+    f03 = next(i for i in p["items"] if i["code"] == "F03")
+    assert f03["hypotheses"][0]["cause"].startswith("Stand failure")
+    assert not next(i for i in p["items"] if i["code"] == "F01")["has_zone"]
 
 
 def test_field_detail_has_memory_and_evolution(client):
     farm = client.get("/api/farms").json()[0]
-    t04 = next(f for f in client.get(f"/api/farms/{farm['id']}").json()["fields"] if f["code"] == "T04")
-    d = client.get(f"/api/fields/{t04['id']}").json()
+    f04 = next(f for f in client.get(f"/api/farms/{farm['id']}").json()["fields"] if f["code"] == "F04")
+    d = client.get(f"/api/fields/{f04['id']}").json()
     assert d["assessment"]["assessment_id"]
-    assert len(d["evolution"]) > 10 and d["evolution"][-1]["vermelho"] > 30
-    assert {"anomalia", "vistoria", "intervencao", "resultado"} <= {m["type"] for m in d["memory"]}
-    assert client.get(f"/api/fields/{t04['id']}/memory", params={"q": "hídrica"}).json()
+    assert len(d["evolution"]) > 10 and d["evolution"][-1]["red"] > 30
+    assert {"anomaly", "inspection", "intervention", "outcome"} <= {m["type"] for m in d["memory"]}
+    assert client.get(f"/api/fields/{f04['id']}/memory", params={"q": "water"}).json()

@@ -20,7 +20,7 @@ export function CopilotChat({ fieldId, fieldCode, source, compact = false }: { f
       const history = msgs.filter((x) => x.role !== "error").map((x) => ({ role: x.role, content: x.content }));
       return api.ask(q, history, fieldId);
     },
-    onSuccess: (r) => setMsgs((p) => [...p, { role: "assistant", content: r.answer.resumo, r }]),
+    onSuccess: (r) => setMsgs((p) => [...p, { role: "assistant", content: r.answer.summary, r }]),
     onError: (e) => setMsgs((p) => [...p, { role: "error", content: (e as Error).message }]),
   });
 
@@ -34,7 +34,7 @@ export function CopilotChat({ fieldId, fieldCode, source, compact = false }: { f
     m.mutate(text);
   };
 
-  const suggestions = (status.data?.suggestions ?? []).map((s) => (fieldCode ? s.replace(/Talhão 04|T04/g, fieldCode) : s));
+  const suggestions = (status.data?.suggestions ?? []).map((s) => (fieldCode ? s.replace(/Field 04|F04/g, fieldCode) : s));
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -44,11 +44,11 @@ export function CopilotChat({ fieldId, fieldCode, source, compact = false }: { f
             <div className="flex items-center gap-3">
               <div className="grid size-10 place-items-center rounded-xl bg-navy-900 text-brand-500"><Bot className="size-5" /></div>
               <div>
-                <div className="text-sm font-semibold text-slate-900">Copiloto da fazenda</div>
-                <div className="text-xs text-slate-500">Responde com dados do app: evidências, confiança, o que falta e a próxima ação.</div>
+                <div className="text-sm font-semibold text-slate-900">Farm copilot</div>
+                <div className="text-xs text-slate-500">Answers from the app’s data: evidence, confidence, what’s missing and the next action.</div>
               </div>
             </div>
-            <div className="mt-5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Experimente perguntar</div>
+            <div className="mt-5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Try asking</div>
             <div className={cn("mt-2 grid gap-2", compact ? "" : "sm:grid-cols-2")}>
               {suggestions.map((s) => (
                 <button key={s} onClick={() => send(s)} className="flex items-start gap-2 rounded-xl border border-slate-200 bg-white p-3 text-left text-xs text-slate-700 transition hover:border-brand-500/50 hover:bg-brand-50/40">
@@ -68,11 +68,11 @@ export function CopilotChat({ fieldId, fieldCode, source, compact = false }: { f
                 <div className="min-w-0 flex-1"><AnswerCard r={x.r} source={source} /></div>
               </div>
             ) : (
-              <div key={i} className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">Não consegui responder: {x.content}</div>
+              <div key={i} className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">Couldn’t answer: {x.content}</div>
             ),
           )}
           {m.isPending && (
-            <div className="flex items-center gap-2 text-xs text-slate-500"><Loader2 className="size-3.5 animate-spin" /> Consultando dados da fazenda…</div>
+            <div className="flex items-center gap-2 text-xs text-slate-500"><Loader2 className="size-3.5 animate-spin" /> Querying farm data…</div>
           )}
           <div ref={end} />
         </div>
@@ -81,20 +81,20 @@ export function CopilotChat({ fieldId, fieldCode, source, compact = false }: { f
       <div className={cn("border-t border-slate-200 bg-white", compact ? "p-3" : "px-6 py-4")}>
         <form onSubmit={(e) => { e.preventDefault(); send(input); }} className={cn("flex items-end gap-2", !compact && "mx-auto max-w-3xl")}>
           {msgs.length > 0 && (
-            <button type="button" onClick={() => setMsgs([])} title="Nova conversa" className="grid size-9 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"><RotateCcw className="size-4" /></button>
+            <button type="button" onClick={() => setMsgs([])} title="New conversation" className="grid size-9 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"><RotateCcw className="size-4" /></button>
           )}
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
             rows={1}
-            placeholder={fieldCode ? `Pergunte sobre o ${fieldCode} ou a fazenda…` : "Pergunte sobre a fazenda…"}
+            placeholder={fieldCode ? `Ask about ${fieldCode} or the farm…` : "Ask about the farm…"}
             className="max-h-32 min-h-9 flex-1 resize-none rounded-lg border border-slate-200 px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-brand-500/30"
           />
-          <button type="submit" disabled={!input.trim() || m.isPending} aria-label="Enviar" className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-600 text-white transition hover:bg-brand-700 disabled:opacity-40"><ArrowUp className="size-4" /></button>
+          <button type="submit" disabled={!input.trim() || m.isPending} aria-label="Send" className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-600 text-white transition hover:bg-brand-700 disabled:opacity-40"><ArrowUp className="size-4" /></button>
         </form>
         <p className={cn("mt-1.5 text-[10px] text-slate-400", !compact && "mx-auto max-w-3xl")}>
-          {status.data?.label ?? "…"} · Consultivo: não cria tarefas sem sua confirmação. Dados de demonstração.
+          {status.data?.label ?? "…"} · Advisory: never creates tasks without your confirmation. Demo data.
         </p>
       </div>
     </div>

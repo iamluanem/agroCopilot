@@ -1,4 +1,4 @@
-"""Casos de uso de leitura do mapa: fazenda, talhões, células, datas e snapshot de risco."""
+"""Map read use cases: farm, fields, cells, dates and risk snapshot."""
 from datetime import date
 from functools import lru_cache
 
@@ -16,12 +16,12 @@ class NotFound(Exception):
 
 
 def _thresholds(s: Session) -> RiskThresholds:
-    cfg = s.get(AppSetting, "risco")
+    cfg = s.get(AppSetting, "risk")
     v = cfg.value if cfg else {}
     return RiskThresholds(
-        yellow=float(v.get("limiar_amarelo", 1.5)),
-        red=float(v.get("limiar_vermelho", 2.5)),
-        weight_hist=float(v.get("peso_historico", 0.6)),
+        yellow=float(v.get("yellow_threshold", 1.5)),
+        red=float(v.get("red_threshold", 2.5)),
+        weight_hist=float(v.get("history_weight", 0.6)),
     )
 
 
@@ -36,7 +36,7 @@ def list_farms(s: Session) -> list[dict]:
 def get_farm(s: Session, farm_id: int) -> dict:
     farm = s.get(Farm, farm_id)
     if not farm:
-        raise NotFound("Fazenda não encontrada")
+        raise NotFound("Farm not found")
     bbox = s.execute(text(
         "SELECT ST_XMin(e), ST_YMin(e), ST_XMax(e), ST_YMax(e) FROM (SELECT ST_Extent(geom) e FROM fields WHERE farm_id=:f) x"
     ), {"f": farm_id}).one()
@@ -45,8 +45,8 @@ def get_farm(s: Session, farm_id: int) -> dict:
         area_ha=farm.area_ha, reference_date=farm.reference_date, soil_notes=farm.soil_notes,
         is_synthetic=farm.is_synthetic, bbox=list(bbox),
         seasons=[dict(id=x.id, name=x.name, sowing_date=x.sowing_date, harvest_date=x.harvest_date,
-                      is_current=x.is_current, expected_yield_sc_ha=x.expected_yield_sc_ha,
-                      realized_yield_sc_ha=x.realized_yield_sc_ha) for x in farm.seasons],
+                      is_current=x.is_current, expected_yield_bags_ha=x.expected_yield_bags_ha,
+                      realized_yield_bags_ha=x.realized_yield_bags_ha) for x in farm.seasons],
         fields=[dict(id=f.id, code=f.code, name=f.name, area_ha=f.area_ha) for f in farm.fields],
     )
 
@@ -81,20 +81,20 @@ def _current_season(s: Session, farm_id: int, on: date | None = None) -> CropSea
         q = q.where(CropSeason.is_current.is_(True))
     season = s.scalars(q.limit(1)).first()
     if not season:
-        raise NotFound("Safra não encontrada")
+        raise NotFound("Season not found")
     return season
 
 
 def observation_dates(s: Session, farm_id: int, season_id: int | None) -> list[dict]:
     season = s.get(CropSeason, season_id) if season_id else _current_season(s, farm_id)
     if not season or season.farm_id != farm_id:
-        raise NotFound("Safra não encontrada")
+        raise NotFound("Season not found")
     rows = s.execute(text("""
-        SELECT date, das, avg(cloud_flag::int) AS cloud, bool_or(source = 'simulacao_pos_intervencao') AS sim
+        SELECT date, das, avg(cloud_flag::int) AS cloud, bool_or(source = 'post_intervention_simulation') AS sim
         FROM observations WHERE season_id=:s GROUP BY date, das ORDER BY date
     """), {"s": season.id}).all()
     return [dict(date=r.date, das=r.das, cloud_pct=round(float(r.cloud) * 100, 1), simulated=bool(r.sim),
-                 source="Simulação pós-intervenção (demo)" if r.sim else "Dados de demonstração", season_id=season.id)
+                 source="Post-intervention simulation (demo)" if r.sim else "Demo data", season_id=season.id)
             for r in rows]
 
 
@@ -118,7 +118,7 @@ def _risk_snapshot_cached(farm_id: int, on: date, t: RiskThresholds) -> dict:
             WHERE o.season_id=:s AND o.date=:d ORDER BY o.cell_id
         """), {"s": season.id, "d": on}).all()
         if not cur:
-            raise NotFound("Sem observações nesta data")
+            raise NotFound("No observations on this date")
         das = cur[0].das
         base = dict(s.execute(text("""
             SELECT o.cell_id, avg(o.ndvi) FROM observations o JOIN crop_seasons cs ON cs.id=o.season_id
@@ -158,18 +158,18 @@ def _risk_snapshot_cached(farm_id: int, on: date, t: RiskThresholds) -> dict:
             max_score=round(float(np.nanmax(risk.score[valid])), 2) if valid.any() else None,
             cloud_pct=round(float(cloud[m].mean()) * 100, 1),
         ))
-    order = {"vermelho": 0, "amarelo": 1, "verde": 2}
-    field_summ.sort(key=lambda x: (order[x["level"]], -(x["area_by_level"]["vermelho"] + x["area_by_level"]["amarelo"])))
+    order = {"red": 0, "yellow": 1, "green": 2}
+    field_summ.sort(key=lambda x: (order[x["level"]], -(x["area_by_level"]["red"] + x["area_by_level"]["yellow"])))
 
     total = float(area.sum())
     farm_by_level = {lvl: round(float(area[risk.level == i].sum()), 1) for i, lvl in enumerate(LEVELS)}
     return dict(
         date=on, das=das, season_id=season.id, season_name=season.name, is_synthetic=True,
-        simulated=cur[0].source == "simulacao_pos_intervencao",
-        source="Simulação pós-intervenção (demo)" if cur[0].source == "simulacao_pos_intervencao" else "Dados de demonstração",
-        method="z-score robusto do NDVI vs. histórico da célula no mesmo DAS (descontada a variação geral da "
-               f"fazenda) e vs. mediana do talhão; score = -({t.weight_hist:.1f}·z_hist + {1 - t.weight_hist:.1f}·z_talhão). "
-               f"Amarelo ≥ {t.yellow}, vermelho ≥ {t.red}. Observações com nuvem descartadas.",
+        simulated=cur[0].source == "post_intervention_simulation",
+        source="Post-intervention simulation (demo)" if cur[0].source == "post_intervention_simulation" else "Demo data",
+        method="Robust NDVI z-score vs. the cell's own history at the same DAS (net of the farm-wide shift) and vs. "
+               f"the field median; score = -({t.weight_hist:.1f}·z_hist + {1 - t.weight_hist:.1f}·z_field). "
+               f"Yellow ≥ {t.yellow}, red ≥ {t.red}. Cloudy observations discarded.",
         thresholds=dict(yellow=t.yellow, red=t.red),
         levels=list(LEVELS), confidence_labels=list(CONFIDENCE),
         cells=dict(
@@ -189,7 +189,7 @@ def _risk_snapshot_cached(farm_id: int, on: date, t: RiskThresholds) -> dict:
 def field_series(s: Session, field_id: int) -> dict:
     field = s.get(Field, field_id)
     if not field:
-        raise NotFound("Talhão não encontrado")
+        raise NotFound("Field not found")
     rows = s.execute(text("""
         SELECT cs.id season_id, cs.name season, cs.is_current, o.date, o.das,
                avg(o.ndvi) FILTER (WHERE NOT o.cloud_flag) ndvi,

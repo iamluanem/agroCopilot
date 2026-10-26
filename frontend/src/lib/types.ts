@@ -1,5 +1,5 @@
-export type Level = "verde" | "amarelo" | "vermelho" | "sem_dado";
-export type Confidence = "baixa" | "moderada" | "alta";
+export type Level = "green" | "yellow" | "red" | "no_data";
+export type Confidence = "low" | "moderate" | "high";
 
 export interface Season {
   id: number;
@@ -7,8 +7,8 @@ export interface Season {
   sowing_date: string;
   harvest_date: string | null;
   is_current: boolean;
-  expected_yield_sc_ha: number | null;
-  realized_yield_sc_ha: number | null;
+  expected_yield_bags_ha: number | null;
+  realized_yield_bags_ha: number | null;
 }
 
 export interface Farm {
@@ -39,7 +39,7 @@ export interface FieldRisk {
   code: string;
   name: string;
   area_ha: number;
-  level: Exclude<Level, "sem_dado">;
+  level: Exclude<Level, "no_data">;
   area_by_level: Record<Level, number>;
   ndvi_mean: number | null;
   ndvi_baseline: number | null;
@@ -102,8 +102,8 @@ export interface FieldSeries {
   }[];
 }
 
-export type LayerMode = "risco" | "ndvi" | "ndre" | "sentinel";
-export type Basemap = "satelite" | "terreno";
+export type LayerMode = "risk" | "ndvi" | "ndre" | "sentinel";
+export type Basemap = "satellite" | "terrain";
 
 export interface HypothesisT {
   rank: number;
@@ -119,19 +119,19 @@ export interface Economics {
   exposure_max: number;
   inspection_cost: number;
   intervention_cost: number;
-  gross_value_rs: number;
+  gross_value_brl: number;
   formula: string;
   label: string;
   assumptions: {
-    produtividade_esperada_sc_ha: number;
-    preco_saca_rs: number;
-    perda_min_pct: number;
-    perda_max_pct: number;
-    custo_vistoria_rs: number;
-    custo_intervencao_rs_ha: number;
-    peso_area_atencao: number;
-    area_critica_ha: number;
-    area_atencao_ha: number;
+    expected_yield_bags_ha: number;
+    bag_price_brl: number;
+    loss_min_pct: number;
+    loss_max_pct: number;
+    inspection_cost_brl: number;
+    intervention_cost_brl_ha: number;
+    watch_area_weight: number;
+    critical_area_ha: number;
+    watch_area_ha: number;
   };
 }
 
@@ -143,7 +143,7 @@ export interface Assessment {
   date: string;
   das: number;
   stage: string;
-  level: Exclude<Level, "sem_dado">;
+  level: Exclude<Level, "no_data">;
   red_ha: number;
   yellow_ha: number;
   ndvi_mean: number | null;
@@ -167,7 +167,7 @@ export interface Assessment {
   worsening?: boolean;
   priority_formula?: string;
   next_step?: string;
-  prior_verified?: { safra: string; causa: string }[];
+  prior_verified?: { season: string; cause: string }[];
   disclaimer?: string;
   hypotheses: HypothesisT[];
   economics: Economics | null;
@@ -183,7 +183,7 @@ export interface Priorities {
 export interface MemoryEvent {
   id: number;
   date: string;
-  type: "safra" | "anomalia" | "vistoria" | "intervencao" | "resultado" | "nota" | "tarefa";
+  type: "season" | "anomaly" | "inspection" | "intervention" | "outcome" | "note" | "task";
   title: string;
   summary: string;
   season: string | null;
@@ -198,10 +198,10 @@ export interface FieldDetail {
   soil_texture: string | null;
   irrigation: string;
   boundary_source: string;
-  season: { id: number; name: string; sowing_date: string; expected_yield_sc_ha: number | null };
+  season: { id: number; name: string; sowing_date: string; expected_yield_bags_ha: number | null };
   date: string;
   assessment: Assessment;
-  evolution: { date: string; das: number; cloud_pct: number; simulated?: boolean; vermelho: number; amarelo: number; sem_dado: number; ndvi: number | null; baseline: number | null }[];
+  evolution: { date: string; das: number; cloud_pct: number; simulated?: boolean; red: number; yellow: number; no_data: number; ndvi: number | null; baseline: number | null }[];
   weather: { date: string; rain_mm: number; tmax_c: number }[];
   memory: MemoryEvent[];
   harvests: { season: string; expected: number | null; realized: number | null }[];
@@ -212,21 +212,21 @@ export interface TaskProposal {
   field_code: string;
   assessment_id: number | null;
   title: string;
-  priority: "alta" | "media" | "baixa";
+  priority: "high" | "medium" | "low";
   assignee: string | null;
   due_date: string | null;
   instructions: string;
 }
 
 export interface CopilotAnswer {
-  resumo: string;
-  evidencias: string[];
-  confianca: Confidence;
-  dados_faltantes: string[];
-  proxima_acao: string;
-  fontes: { tipo: string; rotulo: string; ref: string | null }[];
-  tarefa_proposta: TaskProposal | null;
-  alertas: string[];
+  summary: string;
+  evidence: string[];
+  confidence: Confidence;
+  missing_data: string[];
+  next_action: string;
+  sources: { type: string; label: string; ref: string | null }[];
+  proposed_task: TaskProposal | null;
+  warnings: string[];
 }
 
 export interface CopilotResponse {
@@ -242,7 +242,7 @@ export interface CopilotStatus {
   available: Record<string, boolean>;
 }
 
-export type TaskStatus = "pendente" | "atribuída" | "em_andamento" | "concluída" | "verificada";
+export type TaskStatus = "pending" | "assigned" | "in_progress" | "completed" | "verified";
 
 export interface TaskT {
   id: number;
@@ -253,7 +253,7 @@ export interface TaskT {
   title: string;
   kind: string;
   status: TaskStatus;
-  priority: "alta" | "media" | "baixa";
+  priority: "high" | "medium" | "low";
   assignee: string | null;
   due_date: string | null;
   instructions: string | null;
@@ -344,23 +344,23 @@ export interface OutcomeDetail {
   disclaimer: string;
 }
 
-export interface EconomiaCfg {
-  produtividade_esperada_sc_ha: number;
-  preco_saca_rs: number;
-  perda_min_pct: number;
-  perda_max_pct: number;
-  custo_vistoria_rs: number;
-  custo_intervencao_rs_ha: number;
+export interface EconomicsCfg {
+  expected_yield_bags_ha: number;
+  bag_price_brl: number;
+  loss_min_pct: number;
+  loss_max_pct: number;
+  inspection_cost_brl: number;
+  intervention_cost_brl_ha: number;
 }
-export interface RiscoCfg {
-  limiar_amarelo: number;
-  limiar_vermelho: number;
-  peso_historico: number;
+export interface RiskCfg {
+  yellow_threshold: number;
+  red_threshold: number;
+  history_weight: number;
 }
 export type ProviderChoice = "auto" | "demo" | "anthropic" | "openai";
 export interface SettingsT {
-  economia: EconomiaCfg;
-  risco: RiscoCfg;
+  economics: EconomicsCfg;
+  risk: RiskCfg;
   llm_provider: ProviderChoice;
   copilot: CopilotStatus;
 }

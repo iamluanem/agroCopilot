@@ -1,45 +1,45 @@
-"""Contrato da resposta do copiloto — validado com Pydantic e renderizado como cards (nunca texto cru)."""
+"""Copilot answer contract — validated with Pydantic and rendered as cards (never as raw text)."""
 from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
-Confianca = Literal["baixa", "moderada", "alta"]
+Confidence = Literal["low", "moderate", "high"]
 
 
-class Fonte(BaseModel):
-    tipo: str = Field(description="Tipo de registro consultado: avaliacao, memoria, clima, tarefa, observacoes, economia")
-    rotulo: str = Field(description="Descrição curta do registro, ex.: 'Avaliação T04 em 09/01/2026'")
-    ref: str | None = Field(default=None, description="Identificador do registro, ex.: 'risk_assessment:12'")
+class Source(BaseModel):
+    type: str = Field(description="Kind of record used: assessment, memory, weather, task, observations, economics")
+    label: str = Field(description="Short description of the record, e.g. 'F04 assessment on Jan 9, 2026'")
+    ref: str | None = Field(default=None, description="Record identifier, e.g. 'risk_assessment:12'")
 
 
-class TarefaProposta(BaseModel):
+class ProposedTask(BaseModel):
     field_id: int
     field_code: str
     assessment_id: int | None = None
     title: str
-    priority: Literal["alta", "media", "baixa"] = "alta"
+    priority: Literal["high", "medium", "low"] = "high"
     assignee: str | None = None
     due_date: date | None = None
     instructions: str
 
 
 class CopilotAnswer(BaseModel):
-    resumo: str = Field(description="Resposta direta em 1–3 frases, em português do Brasil")
-    evidencias: list[str] = Field(default_factory=list, description="Fatos dos dados do app que sustentam a resposta")
-    confianca: Confianca = Field(description="Confiança na resposta, dado o que os dados permitem afirmar")
-    dados_faltantes: list[str] = Field(default_factory=list, description="O que falta para afirmar com mais segurança")
-    proxima_acao: str = Field(description="Ação concreta sugerida ao usuário")
-    fontes: list[Fonte] = Field(default_factory=list, description="Registros do app usados na resposta")
-    tarefa_proposta: TarefaProposta | None = Field(
-        default=None, description="Preencher só quando sugerir criar vistoria; a gravação exige confirmação do usuário")
-    alertas: list[str] = Field(default_factory=list, description="Ressalvas obrigatórias (dados sintéticos, receituário…)")
+    summary: str = Field(description="Direct answer in 1–3 sentences, in English")
+    evidence: list[str] = Field(default_factory=list, description="Facts from the app data that support the answer")
+    confidence: Confidence = Field(description="Confidence in the answer, given what the data allows us to claim")
+    missing_data: list[str] = Field(default_factory=list, description="What is missing to answer with more certainty")
+    next_action: str = Field(description="Concrete action suggested to the user")
+    sources: list[Source] = Field(default_factory=list, description="App records used in the answer")
+    proposed_task: ProposedTask | None = Field(
+        default=None, description="Fill only when suggesting an inspection; saving it requires the user's confirmation")
+    warnings: list[str] = Field(default_factory=list, description="Mandatory caveats (synthetic data, prescription…)")
 
 
 class CopilotRequest(BaseModel):
     question: str = Field(min_length=2, max_length=1000)
     history: list[dict] = Field(default_factory=list, description="[{role: user|assistant, content: str}]")
-    field_id: int | None = Field(default=None, description="Talhão em contexto (ex.: selecionado no mapa)")
+    field_id: int | None = Field(default=None, description="Field in context (e.g. selected on the map)")
 
 
 class ToolCall(BaseModel):
@@ -54,17 +54,17 @@ class CopilotResponse(BaseModel):
     is_synthetic_data: bool = True
 
 
-SYSTEM_PROMPT = """Você é o AgroCopilot, copiloto operacional de uma fazenda de soja no Brasil.
-Responda sempre em português do Brasil, de forma direta, usando SOMENTE dados retornados pelas ferramentas.
+SYSTEM_PROMPT = """You are AgroCopilot, the operations copilot of a soybean farm in Brazil.
+Always answer in English, directly, using ONLY data returned by the tools.
 
-Regras inegociáveis:
-- Índice de satélite (NDVI/NDRE) é sinal que direciona vistoria, nunca diagnóstico. Fale em hipóteses com confiança.
-- Nunca invente medições, operações realizadas, custos ou resultados. Se não estiver nas ferramentas, diga que não há registro.
-- Separe exposição estimada (R$) de perda confirmada e de economia realizada. Sempre mostre a faixa e as premissas.
-- Melhora após intervenção é associação, não prova causal — diga isso quando falar de resultados.
-- Qualquer recomendação de defensivo/químico exige: "Requer receituário e validação de engenheiro agrônomo."
-- Os dados desta instalação são de demonstração (sintéticos); inclua isso em alertas.
-- Você é consultivo: não cria tarefas sozinho. Para sugerir vistoria, preencha tarefa_proposta; o usuário confirma.
-- Cite em fontes os registros usados.
+Non-negotiable rules:
+- A satellite index (NDVI/NDRE) is a signal that directs scouting, never a diagnosis. Talk in hypotheses with confidence.
+- Never invent measurements, completed operations, costs or results. If it is not in the tools, say there is no record.
+- Separate estimated exposure (R$) from confirmed loss and from realized savings. Always show the range and assumptions.
+- Improvement after an intervention is association, not proof of causation — say so whenever you discuss results.
+- Any pesticide/chemical recommendation must say: "Requires a prescription and validation by a licensed agronomist."
+- This installation's data is demonstration (synthetic) data; include that in warnings.
+- You are advisory: you never create tasks yourself. To suggest an inspection, fill proposed_task; the user confirms.
+- List the records you used in sources.
 
-Termine SEMPRE chamando a ferramenta `responder` com a resposta estruturada."""
+ALWAYS finish by calling the `respond` tool with the structured answer."""

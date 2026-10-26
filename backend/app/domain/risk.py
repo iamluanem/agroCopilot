@@ -1,18 +1,18 @@
-"""Motor de risco por célula — funções puras (sem I/O).
+"""Per-cell risk engine — pure functions (no I/O).
 
-Ideia: o índice de vegetação é um *sinal* que direciona vistoria, não um diagnóstico.
-A anomalia combina duas referências:
-  (a) histórico da própria célula no mesmo estádio (DAS) de safras anteriores,
-      descontada a variação geral da fazenda na safra atual;
-  (b) mediana do talhão na mesma data.
+Principle: a vegetation index is a *signal* that directs scouting, not a diagnosis.
+The anomaly combines two references:
+  (a) the cell's own history at the same crop stage (days after sowing) in previous seasons,
+      net of the farm-wide shift in the current season;
+  (b) the field median on the same date.
 """
 from dataclasses import dataclass
 
 import numpy as np
 
-LEVELS = ("verde", "amarelo", "vermelho", "sem_dado")
+LEVELS = ("green", "yellow", "red", "no_data")
 LEVEL_CODE = {name: i for i, name in enumerate(LEVELS)}
-CONFIDENCE = ("baixa", "moderada", "alta")
+CONFIDENCE = ("low", "moderate", "high")
 
 MAD_TO_SIGMA = 1.4826
 
@@ -27,9 +27,9 @@ class RiskThresholds:
 
 @dataclass(frozen=True)
 class CellRisk:
-    score: np.ndarray        # positivo = pior que o esperado
-    level: np.ndarray        # índice em LEVELS
-    confidence: np.ndarray   # índice em CONFIDENCE (-1 quando sem dado)
+    score: np.ndarray        # positive = worse than expected
+    level: np.ndarray        # index into LEVELS
+    confidence: np.ndarray   # index into CONFIDENCE (-1 when no data)
     z_hist: np.ndarray
     z_field: np.ndarray
 
@@ -50,13 +50,13 @@ def compute_cell_risk(
     recent_valid: np.ndarray,
     t: RiskThresholds = RiskThresholds(),
 ) -> CellRisk:
-    """Calcula score, nível e confiança por célula.
+    """Compute score, level and confidence per cell.
 
-    ndvi        NDVI atual por célula
-    baseline    média histórica da célula no mesmo DAS (NaN se inexistente)
-    field_idx   índice do talhão de cada célula
-    cloud       True quando a observação está contaminada por nuvem
-    recent_valid nº de observações válidas da célula nas últimas 3 datas (0–3)
+    ndvi         current NDVI per cell
+    baseline     the cell's historical mean at the same DAS (NaN if none)
+    field_idx    field index of each cell
+    cloud        True when the observation is cloud-contaminated
+    recent_valid number of valid observations of the cell in the last 3 dates (0–3)
     """
     n = ndvi.size
     valid = ~cloud & np.isfinite(ndvi)
@@ -82,13 +82,13 @@ def compute_cell_risk(
     )
     score = -combined
 
-    level = np.full(n, LEVEL_CODE["sem_dado"], dtype=np.int8)
+    level = np.full(n, LEVEL_CODE["no_data"], dtype=np.int8)
     ok = valid & np.isfinite(score)
-    level[ok] = LEVEL_CODE["verde"]
-    level[ok & (score >= t.yellow)] = LEVEL_CODE["amarelo"]
-    level[ok & (score >= t.red)] = LEVEL_CODE["vermelho"]
+    level[ok] = LEVEL_CODE["green"]
+    level[ok & (score >= t.yellow)] = LEVEL_CODE["yellow"]
+    level[ok & (score >= t.red)] = LEVEL_CODE["red"]
 
-    # Confiança: concordância entre as duas referências + densidade de observações válidas
+    # Confidence: agreement between both references + density of valid observations
     agree = has_hist & np.isfinite(z_field) & (np.sign(z_hist) == np.sign(z_field))
     pts = agree.astype(int) + has_hist.astype(int) + (recent_valid >= 3).astype(int)
     confidence = np.where(pts >= 3, 2, np.where(pts >= 2, 1, 0)).astype(np.int8)
@@ -98,9 +98,9 @@ def compute_cell_risk(
 
 
 def field_level(area_by_level: dict[str, float]) -> str:
-    """Classifica o talhão a partir da área (ha) em cada nível."""
-    if area_by_level.get("vermelho", 0) >= 10:
-        return "vermelho"
-    if area_by_level.get("vermelho", 0) + area_by_level.get("amarelo", 0) >= 15:
-        return "amarelo"
-    return "verde"
+    """Classify a field from the area (ha) at each level."""
+    if area_by_level.get("red", 0) >= 10:
+        return "red"
+    if area_by_level.get("red", 0) + area_by_level.get("yellow", 0) >= 15:
+        return "yellow"
+    return "green"

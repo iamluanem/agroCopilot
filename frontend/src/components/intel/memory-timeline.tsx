@@ -6,23 +6,23 @@ import { cn, fmtDate } from "@/lib/utils";
 import { DemoBadge } from "../ui/demo-badge";
 
 const TYPE = {
-  safra: { icon: Sprout, label: "Safra", cls: "bg-slate-100 text-slate-600" },
-  anomalia: { icon: AlertTriangle, label: "Anomalia", cls: "bg-red-50 text-red-600" },
-  vistoria: { icon: ClipboardCheck, label: "Vistoria", cls: "bg-sky-50 text-sky-700" },
-  intervencao: { icon: Wrench, label: "Intervenção", cls: "bg-violet-50 text-violet-700" },
-  resultado: { icon: LineChart, label: "Resultado", cls: "bg-emerald-50 text-emerald-700" },
-  nota: { icon: NotebookPen, label: "Nota de campo", cls: "bg-amber-50 text-amber-700" },
-  tarefa: { icon: ClipboardPlus, label: "Tarefa", cls: "bg-brand-50 text-brand-700" },
+  season: { icon: Sprout, label: "Season", cls: "bg-slate-100 text-slate-600" },
+  anomaly: { icon: AlertTriangle, label: "Anomaly", cls: "bg-red-50 text-red-600" },
+  inspection: { icon: ClipboardCheck, label: "Inspection", cls: "bg-sky-50 text-sky-700" },
+  intervention: { icon: Wrench, label: "Intervention", cls: "bg-violet-50 text-violet-700" },
+  outcome: { icon: LineChart, label: "Outcome", cls: "bg-emerald-50 text-emerald-700" },
+  note: { icon: NotebookPen, label: "Field note", cls: "bg-amber-50 text-amber-700" },
+  task: { icon: ClipboardPlus, label: "Task", cls: "bg-brand-50 text-brand-700" },
 } as const;
 
 export function MemoryTimeline({ events }: { events: MemoryEvent[] }) {
   const [q, setQ] = useState("");
-  const [hideSafra, setHideSafra] = useState(true);
+  const [hideSeason, setHideSeason] = useState(true);
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return events.filter((e) => (!hideSafra || e.type !== "safra" || needle) &&
+    return events.filter((e) => (!hideSeason || e.type !== "season" || needle) &&
       (!needle || `${e.title} ${e.summary}`.toLowerCase().includes(needle)));
-  }, [events, q, hideSafra]);
+  }, [events, q, hideSeason]);
   const seasons = [...new Set(list.map((e) => e.season ?? "—"))];
 
   return (
@@ -30,20 +30,20 @@ export function MemoryTimeline({ events }: { events: MemoryEvent[] }) {
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <label className="flex flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-brand-500/30">
           <Search className="size-3.5 text-slate-400" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar na memória — ex.: hídrica, pivô, estande" className="w-full bg-transparent text-xs outline-none placeholder:text-slate-400" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search memory — e.g. water, pivot, stand" className="w-full bg-transparent text-xs outline-none placeholder:text-slate-400" />
         </label>
         <label className="flex items-center gap-1.5 text-[11px] text-slate-500">
-          <input type="checkbox" checked={hideSafra} onChange={(e) => setHideSafra(e.target.checked)} className="accent-brand-600" /> Ocultar marcos de safra
+          <input type="checkbox" checked={hideSeason} onChange={(e) => setHideSeason(e.target.checked)} className="accent-brand-600" /> Hide season milestones
         </label>
         <DemoBadge label="Demo" />
       </div>
-      {list.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-center text-xs text-slate-500">Nada encontrado na memória deste talhão.</p>}
+      {list.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-center text-xs text-slate-500">Nothing found in this field’s memory.</p>}
       {seasons.map((season) => (
         <section key={season} className="mb-4">
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Safra {season}</div>
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Season {season}</div>
           <ol className="relative ml-3 border-l border-slate-200">
             {list.filter((e) => (e.season ?? "—") === season).map((e) => {
-              const t = TYPE[e.type] ?? TYPE.nota;
+              const t = TYPE[e.type] ?? TYPE.note;
               const Icon = t.icon;
               return (
                 <li key={e.id} className="mb-3 ml-5">

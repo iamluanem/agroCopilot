@@ -48,7 +48,7 @@ export function SidePanel(p: Props) {
 function LevelBar({ byLevel, total }: { byLevel: Record<Level, number>; total: number }) {
   return (
     <div className="flex h-2 overflow-hidden rounded-full bg-slate-100">
-      {(["vermelho", "amarelo", "verde", "sem_dado"] as Level[]).map((l) => (
+      {(["red", "yellow", "green", "no_data"] as Level[]).map((l) => (
         <div key={l} style={{ width: `${(byLevel[l] / total) * 100}%`, background: LEVEL_COLOR[l] }} />
       ))}
     </div>
@@ -73,27 +73,27 @@ function FarmView({ farm, risk, riskLoading, onSelectField }: Props) {
         <div>
           <h2 className="text-base font-semibold tracking-tight">{farm.name}</h2>
           <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
-            <MapPin className="size-3" /> {farm.municipality}-{farm.state} · {farm.crop} · Safra {current?.name ?? "—"}
+            <MapPin className="size-3" /> {farm.municipality}-{farm.state} · {farm.crop} · Season {current?.name ?? "—"}
           </p>
         </div>
         <DemoBadge label="Demo" />
       </div>
 
-      {riskLoading && !risk && <Loading label="Calculando risco…" />}
+      {riskLoading && !risk && <Loading label="Computing risk…" />}
       {risk && (
         <>
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <Stat label="Área monitorada" value={fmtHa(risk.summary.total_ha, 0)} hint={`${farm.fields.length} talhões`} />
-            <Stat label="Área saudável" value={fmtPct(risk.summary.pct_by_level.verde)} accent={LEVEL_COLOR.verde} />
-            <Stat label="Em atenção" value={fmtHa(risk.summary.area_by_level.amarelo)} hint={fmtPct(risk.summary.pct_by_level.amarelo)} accent="#b38600" />
-            <Stat label="Crítica" value={fmtHa(risk.summary.area_by_level.vermelho)} hint={fmtPct(risk.summary.pct_by_level.vermelho)} accent={LEVEL_COLOR.vermelho} />
+            <Stat label="Monitored area" value={fmtHa(risk.summary.total_ha, 0)} hint={`${farm.fields.length} fields`} />
+            <Stat label="Healthy area" value={fmtPct(risk.summary.pct_by_level.green)} accent={LEVEL_COLOR.green} />
+            <Stat label="Watch" value={fmtHa(risk.summary.area_by_level.yellow)} hint={fmtPct(risk.summary.pct_by_level.yellow)} accent="#b38600" />
+            <Stat label="Critical" value={fmtHa(risk.summary.area_by_level.red)} hint={fmtPct(risk.summary.pct_by_level.red)} accent={LEVEL_COLOR.red} />
           </div>
           <div className="mt-3"><LevelBar byLevel={risk.summary.area_by_level} total={risk.summary.total_ha} /></div>
 
-          <h3 className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Talhões por severidade</h3>
+          <h3 className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Fields by severity</h3>
           <ul className="space-y-1.5">
             {risk.fields.map((f) => {
-              const affected = f.area_by_level.vermelho + f.area_by_level.amarelo;
+              const affected = f.area_by_level.red + f.area_by_level.yellow;
               const delta = f.ndvi_mean != null && f.ndvi_baseline != null ? f.ndvi_mean - f.ndvi_baseline : null;
               return (
                 <li key={f.field_id}>
@@ -108,8 +108,8 @@ function FarmView({ farm, risk, riskLoading, onSelectField }: Props) {
                         <Badge tone={f.level}>{LEVEL_LABEL[f.level]}</Badge>
                       </div>
                       <div className="mt-0.5 text-[11px] text-slate-500">
-                        {affected > 0.5 ? `${fmtHa(affected)} com anomalia` : "Sem área relevante em anomalia"} · NDVI {fmt(f.ndvi_mean, 2)}
-                        {delta != null && <span className={cn("ml-1", delta < -0.02 ? "text-red-600" : "text-slate-400")}>({delta >= 0 ? "+" : ""}{fmt(delta, 2)} vs. histórico)</span>}
+                        {affected > 0.5 ? `${fmtHa(affected)} anomalous` : "No relevant anomalous area"} · NDVI {fmt(f.ndvi_mean, 2)}
+                        {delta != null && <span className={cn("ml-1", delta < -0.02 ? "text-red-600" : "text-slate-400")}>({delta >= 0 ? "+" : ""}{fmt(delta, 2)} vs. history)</span>}
                       </div>
                     </div>
                     <ChevronRight className="size-4 text-slate-300 group-hover:text-slate-500" />
@@ -135,7 +135,7 @@ function FieldView({ fieldProps: f, fieldRisk: fr, cell, risk, onBack }: Props &
   return (
     <div className="p-5">
       <button onClick={onBack} className="mb-3 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800">
-        <ArrowLeft className="size-3.5" /> Fazenda
+        <ArrowLeft className="size-3.5" /> Farm
       </button>
       <div className="flex items-start justify-between gap-2">
         <div>
@@ -150,33 +150,33 @@ function FieldView({ fieldProps: f, fieldRisk: fr, cell, risk, onBack }: Props &
       {fr && (
         <div className="mt-4">
           <div className="grid grid-cols-3 gap-2">
-            <Stat label="Crítica" value={fmtHa(fr.area_by_level.vermelho)} accent={LEVEL_COLOR.vermelho} />
-            <Stat label="Atenção" value={fmtHa(fr.area_by_level.amarelo)} accent="#b38600" />
-            <Stat label="NDVI médio" value={fmt(fr.ndvi_mean, 2)} hint={`hist. ${fmt(fr.ndvi_baseline, 2)}`} />
+            <Stat label="Critical" value={fmtHa(fr.area_by_level.red)} accent={LEVEL_COLOR.red} />
+            <Stat label="Watch" value={fmtHa(fr.area_by_level.yellow)} accent="#b38600" />
+            <Stat label="Mean NDVI" value={fmt(fr.ndvi_mean, 2)} hint={`hist. ${fmt(fr.ndvi_baseline, 2)}`} />
           </div>
           <div className="mt-3"><LevelBar byLevel={fr.area_by_level} total={fr.area_ha} /></div>
         </div>
       )}
 
       <div className="mt-6">
-        {assess.isLoading && <Loading label="Analisando zona, hipóteses e exposição…" />}
+        {assess.isLoading && <Loading label="Analyzing zone, hypotheses and exposure…" />}
         {assess.error && <ErrorState error={assess.error} onRetry={() => assess.refetch()} />}
         {assess.data && <AssessmentPanel a={assess.data} compact footer={<CreateTaskButton a={assess.data} />} />}
-        <Link href={`/talhoes/${f.id}`} className="mt-4 flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
-          Abrir talhão: histórico e memória <ArrowRight className="size-3.5" />
+        <Link href={`/fields/${f.id}`} className="mt-4 flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
+          Open field: history and memory <ArrowRight className="size-3.5" />
         </Link>
       </div>
 
-      <h3 className="mb-1 mt-6 text-[11px] font-semibold uppercase tracking-wide text-slate-500">NDVI médio do talhão por safra</h3>
+      <h3 className="mb-1 mt-6 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Field mean NDVI by season</h3>
       {series.isLoading && <Loading />}
       {series.error && <ErrorState error={series.error} onRetry={() => series.refetch()} />}
       {series.data && <FieldSeriesChart series={series.data} das={risk?.das} />}
-      <p className="text-[11px] text-slate-400">Médias de células sem nuvem. Linha tracejada vertical: data selecionada.</p>
+      <p className="text-[11px] text-slate-400">Means of cloud-free cells. Dashed vertical line: selected date.</p>
 
       <dl className="mt-5 space-y-2 text-xs">
-        <div className="flex gap-2"><Layers className="mt-0.5 size-3.5 text-slate-400" /><dt className="w-16 text-slate-500">Solo</dt><dd className="flex-1">{f.soil_texture ?? "—"}</dd></div>
-        <div className="flex gap-2"><Droplets className="mt-0.5 size-3.5 text-slate-400" /><dt className="w-16 text-slate-500">Manejo</dt><dd className="flex-1 capitalize">{f.irrigation}</dd></div>
-        <div className="flex gap-2"><MapPin className="mt-0.5 size-3.5 text-slate-400" /><dt className="w-16 text-slate-500">Limite</dt><dd className="flex-1">{f.boundary_source === "demo_sintetico" ? "Polígono sintético (demonstração)" : f.boundary_source}</dd></div>
+        <div className="flex gap-2"><Layers className="mt-0.5 size-3.5 text-slate-400" /><dt className="w-16 text-slate-500">Soil</dt><dd className="flex-1">{f.soil_texture ?? "—"}</dd></div>
+        <div className="flex gap-2"><Droplets className="mt-0.5 size-3.5 text-slate-400" /><dt className="w-16 text-slate-500">Water</dt><dd className="flex-1 capitalize">{f.irrigation}</dd></div>
+        <div className="flex gap-2"><MapPin className="mt-0.5 size-3.5 text-slate-400" /><dt className="w-16 text-slate-500">Boundary</dt><dd className="flex-1">{f.boundary_source === "synthetic_demo" ? "Synthetic polygon (demo)" : f.boundary_source}</dd></div>
       </dl>
     </div>
   );
@@ -185,32 +185,32 @@ function FieldView({ fieldProps: f, fieldRisk: fr, cell, risk, onBack }: Props &
 function CellCard({ cell, risk, fieldName }: { cell: CellInfo; risk: RiskSnapshot; fieldName: string }) {
   const diff = cell.ndvi != null && cell.baseline != null ? cell.ndvi - cell.baseline : null;
   const why =
-    cell.level === "sem_dado"
-      ? "A observação desta célula foi descartada por cobertura de nuvem. Escolha outra data."
-      : `NDVI ${fmt(cell.ndvi, 2)} ${diff != null ? `está ${fmt(Math.abs(diff), 2)} ${diff < 0 ? "abaixo" : "acima"} do histórico desta célula no mesmo estádio (DAS ${risk.das})` : "sem histórico comparável"}. ` +
-        `Score de anomalia ${fmt(cell.score, 1)} — limiares: atenção ≥ ${fmt(risk.thresholds.yellow, 1)}, crítico ≥ ${fmt(risk.thresholds.red, 1)}.`;
+    cell.level === "no_data"
+      ? "This cell's observation was discarded due to cloud cover. Pick another date."
+      : `NDVI ${fmt(cell.ndvi, 2)} ${diff != null ? `is ${fmt(Math.abs(diff), 2)} ${diff < 0 ? "below" : "above"} this cell's history at the same stage (DAS ${risk.das})` : "has no comparable history"}. ` +
+        `Anomaly score ${fmt(cell.score, 1)} — thresholds: watch ≥ ${fmt(risk.thresholds.yellow, 1)}, critical ≥ ${fmt(risk.thresholds.red, 1)}.`;
   return (
     <div className="mt-4 rounded-xl border p-4" style={{ borderColor: `${LEVEL_COLOR[cell.level]}66`, background: `${LEVEL_COLOR[cell.level]}0d` }}>
       <div className="flex items-center justify-between">
-        <div className="text-xs font-semibold text-slate-700">Célula de manejo #{cell.id}</div>
+        <div className="text-xs font-semibold text-slate-700">Management cell #{cell.id}</div>
         <span className="inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color: LEVEL_COLOR[cell.level] }}>
           <span className="size-2 rounded-full" style={{ background: LEVEL_COLOR[cell.level] }} />{LEVEL_LABEL[cell.level]}
         </span>
       </div>
       <div className="mt-3 grid grid-cols-3 gap-y-2 text-xs">
         <Metric label="NDVI" value={fmt(cell.ndvi, 2)} />
-        <Metric label="Histórico" value={fmt(cell.baseline, 2)} />
-        <Metric label="Diferença" value={diff == null ? "—" : `${diff >= 0 ? "+" : ""}${fmt(diff, 2)}`} />
+        <Metric label="History" value={fmt(cell.baseline, 2)} />
+        <Metric label="Difference" value={diff == null ? "—" : `${diff >= 0 ? "+" : ""}${fmt(diff, 2)}`} />
         <Metric label="NDRE" value={fmt(cell.ndre, 2)} />
         <Metric label="Score" value={fmt(cell.score, 1)} />
-        <Metric label="Confiança" value={cell.confidence ?? "—"} />
+        <Metric label="Confidence" value={cell.confidence ?? "—"} />
       </div>
-      <p className="mt-3 text-xs leading-relaxed text-slate-600"><span className="font-medium text-slate-800">Por que essa cor? </span>{why}</p>
-      {(cell.level === "vermelho" || cell.level === "amarelo") && (
-        <p className="mt-2 text-[11px] font-medium text-slate-700">Esta célula faz parte da zona em anomalia do talhão. Hipóteses e exposição abaixo.</p>
+      <p className="mt-3 text-xs leading-relaxed text-slate-600"><span className="font-medium text-slate-800">Why this color? </span>{why}</p>
+      {(cell.level === "red" || cell.level === "yellow") && (
+        <p className="mt-2 text-[11px] font-medium text-slate-700">This cell is part of the field’s anomalous zone. Hypotheses and exposure below.</p>
       )}
       <p className="mt-2 text-[11px] text-slate-500">
-        {fieldName} · {fmt(cell.area_ha, 2)} ha · {fmtDate(risk.date)} · Sinal para direcionar vistoria, não diagnóstico.
+        {fieldName} · {fmt(cell.area_ha, 2)} ha · {fmtDate(risk.date)} · A signal to direct scouting, not a diagnosis.
       </p>
     </div>
   );
@@ -228,9 +228,9 @@ function Metric({ label, value }: { label: string; value: string }) {
 function MethodNote({ risk }: { risk: RiskSnapshot }) {
   return (
     <details className="mt-6 rounded-lg bg-slate-50 p-3 text-[11px] text-slate-600">
-      <summary className="flex cursor-pointer items-center gap-1.5 font-medium text-slate-700"><Info className="size-3.5" /> Como o risco é calculado</summary>
+      <summary className="flex cursor-pointer items-center gap-1.5 font-medium text-slate-700"><Info className="size-3.5" /> How risk is calculated</summary>
       <p className="mt-2 leading-relaxed">{risk.method}</p>
-      <p className="mt-1.5 leading-relaxed">Fonte: {risk.source}. Os valores não são medições reais de satélite.</p>
+      <p className="mt-1.5 leading-relaxed">Source: {risk.source}. Values are not real satellite measurements.</p>
     </details>
   );
 }

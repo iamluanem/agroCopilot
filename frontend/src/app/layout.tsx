@@ -7,12 +7,12 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "AgroCopilot",
-  description: "Copiloto operacional da fazenda — do alerta à prova de resultado.",
+  description: "Farm operations copilot — from alert to proof of results.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body>
         <Providers>
           <div className="flex h-dvh flex-col overflow-hidden md:flex-row">

@@ -27,7 +27,7 @@ export function FieldSeriesChart({ series, das }: { series: FieldSeries; das?: n
           <Line
             key={s.season}
             dataKey={s.season}
-            name={`Safra ${s.season}`}
+            name={`Season ${s.season}`}
             connectNulls
             dot={false}
             isAnimationActive={false}

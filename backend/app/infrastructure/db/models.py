@@ -1,4 +1,4 @@
-"""Modelo de dados (reduzido). Todas as geometrias em EPSG:4326."""
+"""Data model (reduced). All geometries in EPSG:4326."""
 from datetime import date, datetime
 
 from geoalchemy2 import Geometry
@@ -38,8 +38,8 @@ class CropSeason(Base):
     crop: Mapped[str] = mapped_column(String(60))
     sowing_date: Mapped[date] = mapped_column(Date)
     harvest_date: Mapped[date | None] = mapped_column(Date)
-    expected_yield_sc_ha: Mapped[float | None] = mapped_column(Float)
-    realized_yield_sc_ha: Mapped[float | None] = mapped_column(Float)
+    expected_yield_bags_ha: Mapped[float | None] = mapped_column(Float)
+    realized_yield_bags_ha: Mapped[float | None] = mapped_column(Float)
     is_current: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
@@ -51,8 +51,8 @@ class Field(Synthetic, Base):
     name: Mapped[str] = mapped_column(String(60))
     area_ha: Mapped[float] = mapped_column(Float)
     soil_texture: Mapped[str | None] = mapped_column(String(60))
-    irrigation: Mapped[str] = mapped_column(String(30), default="sequeiro")
-    boundary_source: Mapped[str] = mapped_column(String(30), default="demo_sintetico")
+    irrigation: Mapped[str] = mapped_column(String(30), default="rainfed")
+    boundary_source: Mapped[str] = mapped_column(String(30), default="synthetic_demo")
     geom = mapped_column(Geometry("POLYGON", srid=4326), nullable=False)
     farm: Mapped[Farm] = relationship(back_populates="fields")
 
@@ -73,7 +73,7 @@ class Observation(Base):
     cell_id: Mapped[int] = mapped_column(ForeignKey("management_cells.id", ondelete="CASCADE"))
     season_id: Mapped[int] = mapped_column(ForeignKey("crop_seasons.id", ondelete="CASCADE"))
     date: Mapped[date] = mapped_column(Date)
-    das: Mapped[int] = mapped_column(SmallInteger)  # dias após semeadura
+    das: Mapped[int] = mapped_column(SmallInteger)  # days after sowing
     ndvi: Mapped[float | None] = mapped_column(Float)
     ndre: Mapped[float | None] = mapped_column(Float)
     cloud_flag: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -101,12 +101,12 @@ class RiskAssessment(Synthetic, Base):
     field_id: Mapped[int] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), index=True)
     cell_id: Mapped[int | None] = mapped_column(ForeignKey("management_cells.id", ondelete="CASCADE"))
     date: Mapped[date] = mapped_column(Date)
-    level: Mapped[str] = mapped_column(String(12))  # verde|amarelo|vermelho
+    level: Mapped[str] = mapped_column(String(12))  # green|yellow|red
     anomaly_score: Mapped[float] = mapped_column(Float)
-    confidence: Mapped[str] = mapped_column(String(10))  # baixa|moderada|alta
+    confidence: Mapped[str] = mapped_column(String(10))  # low|moderate|high
     method: Mapped[str] = mapped_column(String(60))
     affected_ha: Mapped[float | None] = mapped_column(Float)
-    geom = mapped_column(Geometry("MULTIPOLYGON", srid=4326))  # zona afetada
+    geom = mapped_column(Geometry("MULTIPOLYGON", srid=4326))  # affected zone
     details: Mapped[dict] = mapped_column(JSON, default=dict)
     hypotheses: Mapped[list["Hypothesis"]] = relationship(order_by="Hypothesis.rank")
 
@@ -141,12 +141,12 @@ class Task(Synthetic, Base):
     field_id: Mapped[int] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), index=True)
     assessment_id: Mapped[int | None] = mapped_column(ForeignKey("risk_assessments.id", ondelete="SET NULL"))
     title: Mapped[str] = mapped_column(String(160))
-    kind: Mapped[str] = mapped_column(String(30), default="vistoria")
-    priority: Mapped[str] = mapped_column(String(10))  # alta|media|baixa
+    kind: Mapped[str] = mapped_column(String(30), default="inspection")
+    priority: Mapped[str] = mapped_column(String(10))  # high|medium|low
     assignee: Mapped[str | None] = mapped_column(String(80))
     due_date: Mapped[date | None] = mapped_column(Date)
     instructions: Mapped[str | None] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(String(20), default="pendente")
+    status: Mapped[str] = mapped_column(String(20), default="pending")
     geom = mapped_column(Geometry("MULTIPOLYGON", srid=4326))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -206,7 +206,7 @@ class MemoryEvent(Synthetic, Base):
     field_id: Mapped[int] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), index=True)
     season_id: Mapped[int | None] = mapped_column(ForeignKey("crop_seasons.id", ondelete="SET NULL"))
     date: Mapped[date] = mapped_column(Date)
-    type: Mapped[str] = mapped_column(String(30))  # anomalia|vistoria|intervencao|resultado|nota|safra
+    type: Mapped[str] = mapped_column(String(30))  # anomaly|inspection|intervention|outcome|note|season|task
     title: Mapped[str] = mapped_column(String(160))
     summary: Mapped[str] = mapped_column(Text)
     refs: Mapped[dict] = mapped_column(JSON, default=dict)

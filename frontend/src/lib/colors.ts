@@ -1,27 +1,27 @@
 import type { Level } from "./types";
 
 export const LEVEL_COLOR: Record<Level, string> = {
-  verde: "#22a35a",
-  amarelo: "#f2b705",
-  vermelho: "#e0362c",
-  sem_dado: "#94a3b8",
+  green: "#22a35a",
+  yellow: "#f2b705",
+  red: "#e0362c",
+  no_data: "#94a3b8",
 };
 
 export const LEVEL_LABEL: Record<Level, string> = {
-  verde: "Saudável",
-  amarelo: "Atenção",
-  vermelho: "Crítico",
-  sem_dado: "Sem dado (nuvem)",
+  green: "Healthy",
+  yellow: "Watch",
+  red: "Critical",
+  no_data: "No data (cloud)",
 };
 
 export const LEVEL_DESC: Record<Level, string> = {
-  verde: "Sem anomalia significativa",
-  amarelo: "Anomalia moderada — acompanhar",
-  vermelho: "Anomalia alta — priorizar vistoria",
-  sem_dado: "Observação descartada por nuvem",
+  green: "No significant anomaly",
+  yellow: "Moderate anomaly — keep an eye on it",
+  red: "Strong anomaly — prioritize an inspection",
+  no_data: "Observation discarded due to clouds",
 };
 
-// Rampa contínua para índices de vegetação (vermelho → amarelo → verde)
+// Continuous ramp for vegetation indices (red → yellow → green)
 export const INDEX_RAMP: Record<"ndvi" | "ndre", [number, string][]> = {
   ndvi: [
     [0.3, "#a50026"],

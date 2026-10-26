@@ -1,33 +1,37 @@
 # AgroCopilot
 
-**Copiloto operacional da fazenda — do alerta à prova de resultado.**
+**A farm operations copilot: from the first alert to proof that the fix worked.**
 
-Mapas de NDVI já são commodity. O diferencial do AgroCopilot é o ciclo fechado:
+NDVI maps are a commodity by now. What AgroCopilot adds is the closed loop:
 
-> **Detectar → Priorizar (R$) → Recomendar → Tarefa → Vistoriar → Intervir → Medir → Lembrar**
+> **Detect → Prioritize (R$) → Recommend → Task → Inspect → Intervene → Measure → Remember**
 
-O índice de satélite é um **sinal que direciona a vistoria**, nunca um diagnóstico. A plataforma separa observação,
-hipótese (com confiança) e achado verificado em campo, e constrói uma memória auditável do que funcionou em cada talhão.
+The satellite index is a **signal that tells you where to scout**. It is never a diagnosis. The platform keeps the
+observation, the hypotheses (each with a confidence level) and the cause verified in the field separate. Over time it
+builds an auditable memory of what worked in each field.
 
-> ⚠️ **Dados de demonstração.** A Fazenda Santa Aurora, seus limites, NDVI/NDRE, clima e histórico operacional são
-> **sintéticos e determinísticos**. Não representam medições reais de satélite nem operações reais de campo.
-> Todo registro sintético tem `is_synthetic = true` e é sinalizado na interface.
+> ⚠️ **Demo data.** Santa Aurora Farm, its field boundaries, NDVI/NDRE, weather and operational history are all
+> **synthetic and deterministic**. None of it is a real satellite measurement or a real field operation.
+> Every synthetic record has `is_synthetic = true` and is flagged in the interface.
 
-![Visão Geral — prioridades por exposição em R$](docs/screenshots/fase2-visao-geral.jpg)
+The scenario is set in Brazil (Sorriso, Mato Grosso). Money is shown in **Brazilian reais (R$)** and yield in
+**bags/ha**, where one bag is the 60 kg sack Brazilian soybean is traded in.
+
+![Overview: priorities ranked by R$ exposure](docs/screenshots/overview.jpg)
 
 ## Status
 
-| Fase | Escopo | Status |
+| Phase | Scope | Status |
 |---|---|---|
-| 1 · Fundação | Docker Compose, PostGIS, migrações, seed, tela **Mapa** com talhões e células por risco | ✅ |
-| 2 · Inteligência | Hipóteses com evidência e dado faltante, exposição em R$, priorização, telas **Visão Geral** e **Talhão** | ✅ |
-| 3 · Copiloto | Chat com cards estruturados, 10 ferramentas sobre dados reais, `DemoProvider` + Claude/OpenAI, vistoria com confirmação | ✅ |
-| 4 · Loop operacional | **Tarefas** (execução mobile com foto e rascunho offline), verificação do agrônomo, intervenção, simulação pós-intervenção, **Resultados**, memória | ✅ |
-| 5 · Polimento | **Configurações** editáveis com recálculo, reinício da demo, **Sentinel-2 real** no mapa, navegação mobile | ✅ |
+| 1 · Foundation | Docker Compose, PostGIS, migrations, seed, **Map** screen with fields and management cells colored by risk | ✅ |
+| 2 · Intelligence | Hypotheses with evidence and missing data, R$ exposure, prioritization, **Overview** and **Field** screens | ✅ |
+| 3 · Copilot | Chat with structured cards, 10 tools over real app data, `DemoProvider` + Claude/OpenAI, inspection proposals that need your confirmation | ✅ |
+| 4 · Operational loop | **Tasks** (mobile execution with photos and offline draft), agronomist verification, intervention, post-intervention simulation, **Outcomes**, field memory | ✅ |
+| 5 · Polish | Editable **Settings** with recalculation, demo reset, **real Sentinel-2** layer on the map, mobile navigation | ✅ |
 
-## Como rodar
+## Running it
 
-Pré-requisito: Docker Desktop.
+You need Docker Desktop.
 
 **macOS / Linux**
 ```bash
@@ -41,22 +45,22 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
-Na primeira subida a API aplica as migrações e o seed (~20 s). Depois abra:
+On first start the API runs the migrations and the seed (about 20 s). Then open:
 
 - App: http://localhost:3000
 - API (OpenAPI): http://localhost:8000/docs
 
-Recriar o seed do zero:
+To rebuild the seed from scratch:
 ```bash
 docker compose exec api python -m app.infrastructure.seed.seed --reset
 ```
 
-Testes (atenção: os testes de integração executam `demo/reset` e apagam o que foi criado na demonstração):
+Tests. Note that the integration tests call `demo/reset`, which deletes anything created during a demo:
 ```bash
 docker compose exec api pytest -q
 ```
 
-### Desenvolvimento sem Docker para API/web
+### Running the API and web app without Docker
 
 ```bash
 docker compose up -d db
@@ -66,27 +70,27 @@ pip install -r requirements-dev.txt
 export DATABASE_URL=postgresql+psycopg://agro:agro@localhost:5433/agrocopilot  # PowerShell: $env:DATABASE_URL="..."
 alembic upgrade head && python -m app.infrastructure.seed.seed
 uvicorn app.api.main:app --reload
-# frontend (outro terminal)
+# frontend (another terminal)
 cd frontend && npm install && npm run dev
 ```
 
-## Arquitetura
+## Architecture
 
 ```mermaid
 flowchart LR
   subgraph web["frontend · Next.js"]
-    UI[Visão Geral · Mapa · Talhões<br/>Copiloto · Tarefas · Resultados · Configurações]
+    UI[Overview · Map · Fields<br/>Copilot · Tasks · Outcomes · Settings]
   end
   subgraph api["backend · FastAPI"]
-    R[api/routers] --> A[application<br/>risco · inteligência · copiloto · operação]
-    A --> D[domain<br/>risco · hipóteses · economia · contrato do copiloto]
+    R[api/routers] --> A[application<br/>risk · intelligence · copilot · operations]
+    A --> D[domain<br/>risk · hypotheses · economics · copilot contract]
     A --> I[infrastructure<br/>SQLAlchemy/PostGIS · LLM providers · seed]
     T[copilot_tools] --> A
   end
-  LLM[(Claude / OpenAI<br/>opcional)]
+  LLM[(Claude / OpenAI<br/>optional)]
   S2[(Earth Search STAC<br/>Sentinel-2 L2A)]
   DB[(PostgreSQL 16 + PostGIS)]
-  M[(volume media<br/>fotos · camadas S2)]
+  M[(media volume<br/>photos · S2 layers)]
   UI -->|REST/JSON| R
   I --> DB
   I -.tool calling.-> LLM
@@ -97,109 +101,119 @@ flowchart LR
 
 ```
 backend/
-  app/domain/          regras puras (motor de risco) — sem I/O, 100% testável
-  app/application/     casos de uso (consultas do mapa, snapshot de risco)
-  app/infrastructure/  banco (modelos, sessão) e seed do cenário demo
-  app/api/             rotas FastAPI
-  alembic/             migrações
+  app/domain/          pure rules (risk engine, hypotheses, economics): no I/O, fully testable
+  app/application/     use cases (map queries, risk snapshots, copilot, operations)
+  app/infrastructure/  database (models, session), LLM providers and the demo seed
+  app/api/             FastAPI routes
+  alembic/             migrations
 frontend/
-  src/components/map/  mapa, timeline de datas, legenda, painel lateral
+  src/app/             routes: / · /map · /fields · /copilot · /tasks · /outcomes · /settings
+  src/components/      map, intel, copilot, ops and ui components
+tools/record-demo/     Playwright script that records the demo video
 ```
 
-### Motor de risco (Fase 1)
+### Risk engine (phase 1)
 
-Para cada célula de manejo de 30 × 30 m, numa data de observação:
+For each 30 × 30 m management cell on an observation date:
 
-- `z_hist`: diferença entre o NDVI atual e a média da **própria célula no mesmo estádio (DAS)** em safras anteriores,
-  descontada a variação geral da fazenda nesta safra (para não marcar a fazenda inteira em ano seco);
-- `z_talhão`: desvio robusto (mediana/MAD) em relação à mediana do talhão na mesma data;
-- `score = −(0,6·z_hist + 0,4·z_talhão)`. Atenção ≥ 1,5; crítico ≥ 2,5 (configurável);
-- confiança: concordância entre as duas referências + existência de histórico + observações válidas recentes;
-- observações com nuvem são descartadas (célula fica "sem dado").
+- `z_hist` compares current NDVI with the **same cell at the same crop stage (days after sowing, DAS)** in previous
+  seasons. It discounts the farm-wide shift for this season, so a dry year does not flag the whole farm.
+- `z_field` is a robust deviation (median/MAD) from the field median on the same date.
+- `score = −(0.6·z_hist + 0.4·z_field)`. Watch ≥ 1.5; critical ≥ 2.5. Both are configurable.
+- Confidence comes from agreement between the two references, whether history exists, and how many recent valid
+  observations there are.
+- Cloudy observations are discarded, and the cell shows as "no data".
 
-### Hipóteses e economia (Fase 2)
+### Hypotheses and economics (phase 2)
 
-Para cada talhão em atenção/crítico, a **zona** (células amarelas + vermelhas) é materializada em `risk_assessments`
-com hipóteses e estimativa econômica — o mesmo registro que tarefas e copiloto vão referenciar.
+For each field in watch or critical status, the **zone** (yellow + red cells) is stored in `risk_assessments`, along with
+its hypotheses and economic estimate. Tasks and the copilot reference that same record.
 
-- **Hipóteses por regras** (`domain/hypotheses.py`): deficiência hídrica, pragas/doenças, nutricional e falha de estande,
-  pontuadas por contexto — sequência de dias sem chuva, textura do solo, padrão espacial (setor contíguo, faixa linear,
-  manchas), início da anomalia no ciclo, recorrência e vistorias anteriores. Cada uma lista **evidências** (inclusive
-  contra) e o **dado que falta**. Sem vistoria, nenhuma passa de confiança *moderada*.
-- **Exposição** (`domain/economics.py`): `área afetada × sc/ha × R$/sc × faixa de perda`, com área afetada = crítica +
-  50% da atenção. Mostrada como faixa, com premissas visíveis. Nunca apresentada como perda ou economia realizada.
-- **Prioridade** = exposição média × urgência (estádio fenológico + tendência) × peso da confiança.
+- **Rule-based hypotheses** (`domain/hypotheses.py`): water stress, pest/disease, nutrient deficiency and stand failure.
+  Each is scored on context: the run of days without rain, soil texture, spatial pattern (contiguous sector, linear
+  strip, scattered patches), when in the cycle the anomaly began, recurrence and past inspections. Each hypothesis lists
+  its **evidence** (including evidence against it) and the **data still needed** to confirm it. Without a field
+  inspection, no hypothesis goes above *moderate* confidence.
+- **Exposure** (`domain/economics.py`): `affected area × bags/ha × R$/bag × loss range`. The affected area is the
+  critical area plus 50% of the watch area. Exposure is shown as a range with visible assumptions, and is never
+  presented as a confirmed loss or as realized savings.
+- **Priority** = mid exposure × urgency (crop stage + trend) × confidence weight.
 
-### Copiloto (Fase 3)
+### Copilot (phase 3)
 
-Página **Copiloto** e gaveta no **Mapa** (com o talhão selecionado como contexto). Toda resposta segue o schema
-`CopilotAnswer` (Pydantic): `resumo`, `evidencias`, `confianca`, `dados_faltantes`, `proxima_acao`, `fontes`,
-`alertas` e, opcionalmente, `tarefa_proposta` — que só vira tarefa quando o usuário confirma.
+The copilot has its own **Copilot** page and a drawer on the **Map** that uses the selected field as context. Every
+answer follows the `CopilotAnswer` schema (Pydantic): `summary`, `evidence`, `confidence`, `missing_data`,
+`next_action`, `sources` and `warnings`. It can also include a `proposed_task`, which becomes a real task only after the
+user confirms it.
 
-| Provedor | Quando é usado |
+| Provider | When it is used |
 |---|---|
-| `DemoProvider` | Padrão sem chave. Regras determinísticas sobre as **mesmas ferramentas** — ideal para gravar a demo |
-| Claude | `ANTHROPIC_API_KEY` definida (modelo em `ANTHROPIC_MODEL`) |
-| OpenAI | `OPENAI_API_KEY` definida (modelo em `OPENAI_MODEL`) |
+| `DemoProvider` | Default when no key is set. Deterministic rules over the **same tools**, which makes it ideal for recording the demo |
+| Claude | `ANTHROPIC_API_KEY` is set (model in `ANTHROPIC_MODEL`) |
+| OpenAI | `OPENAI_API_KEY` is set (model in `OPENAI_MODEL`) |
 
-`LLM_PROVIDER=auto|demo|anthropic|openai` força a escolha. Se o LLM falhar, a resposta cai para o modo demo com aviso.
-O LLM só acessa dados via ferramentas (`get_farm_summary`, `get_field_risk`, `get_memory`, `estimate_economics`,
-`get_intervention_outcomes`, `propose_inspection`…) e termina chamando `responder`, validado contra o schema.
+`LLM_PROVIDER=auto|demo|anthropic|openai` forces a choice. If the LLM call fails, the answer falls back to demo mode
+with a warning. The LLM can read data only through tools (`get_farm_summary`, `get_field_risk`, `get_memory`,
+`estimate_economics`, `get_intervention_outcomes`, `propose_inspection`…). It finishes by calling `respond`, and the
+answer is validated against the schema.
 
-Para usar Claude: coloque a chave no `.env` (`ANTHROPIC_API_KEY=...`) e rode `docker compose up -d api`.
+To use Claude, put your key in `.env` (`ANTHROPIC_API_KEY=...`) and run `docker compose up -d api`.
 
-### Loop operacional (Fase 4)
+### Operational loop (phase 4)
 
-`pendente → atribuída → em andamento → vistoria concluída → verificada (agrônomo) → intervenção → resultado`
+`pending → assigned → in progress → inspection completed → verified (agronomist) → intervention → outcome`
 
-- A vistoria registra achados, **causa verificada**, até 6 fotos (redimensionadas no aparelho) e fica em rascunho
-  no `localStorage` enquanto é preenchida.
-- Intervenção só é aceita após verificação do agrônomo; ação com produto químico exige confirmar o receituário.
-- **Simular observações pós-intervenção (demo):** gera 3 cenas sintéticas (5, 10 e 15 dias depois), marcadas como
-  `simulacao_pos_intervencao`, e mede o resultado por diferença-em-diferenças contra o restante do talhão.
-- Cada passo vira evento na memória do talhão; o copiloto passa a responder sobre o novo resultado.
-- `POST /api/demo/reset` (ou `docker compose exec api python -c "..."`) remove tudo que foi criado na demonstração.
+- The inspection form records findings, the **verified cause** and up to 6 photos (resized on the device). The draft is
+  kept in `localStorage` while it is being filled in.
+- An intervention is accepted only after the agronomist verifies the inspection. Any action involving a chemical
+  product also requires confirming that a prescription was issued.
+- **Simulate post-intervention observations (demo)** generates 3 synthetic scenes (5, 10 and 15 days later), labeled
+  `post_intervention_simulation`. The outcome is measured with difference-in-differences against the rest of the field.
+- Every step becomes an event in the field's memory, and the copilot can then answer questions about the new outcome.
+- `POST /api/demo/reset` removes everything created during the demo.
 
-## Roteiro do vídeo (60–90 s)
+## Video script (60–90 s)
 
-1. **Visão Geral** → T04 é a prioridade #1 com exposição em R$.
-2. **Mapa** → células coloridas, troca de datas, opacidade.
-3. Clique numa célula vermelha do T04 → hipóteses, confiança, dado faltante, premissas econômicas.
-4. **Copiloto** (gaveta) → "Por que o Talhão 04 está vermelho?"
-5. → "Isso já aconteceu aqui? O que funcionou?"
-6. Painel do talhão → **Criar vistoria para esta zona**.
-7. Celular (`/tarefas/<id>`) → iniciar, descrever, causa = deficiência hídrica, foto, concluir.
-8. Verificar como agrônomo → registrar intervenção com custo.
-9. **Simular observações pós-intervenção** → relatório de **Resultados** (antes/depois, método, limitações).
-10. **Talhões → T04** → memória com o ciclo novo completo.
+1. **Overview**: F04 is priority #1, with its exposure in R$.
+2. **Map**: colored cells, switching dates, layer opacity.
+3. Click a red cell in F04 to see hypotheses, confidence, missing data and economic assumptions.
+4. **Copilot** (drawer): "Why is Field 04 red?"
+5. Then: "Has this happened in this field before? What worked?"
+6. Field panel → **Create inspection for this zone**.
+7. On the phone (`/tasks/<id>`): start, describe, set the cause to water stress, add a photo, complete.
+8. Verify as the agronomist, then record the intervention with its cost.
+9. **Simulate post-intervention observations** → the **Outcomes** report (before/after, method, limitations).
+10. **Fields → F04**: the field memory now shows the complete new cycle.
 
-Para regravar: `curl -X POST localhost:8000/api/demo/reset` (PowerShell: `Invoke-RestMethod -Method Post localhost:8000/api/demo/reset`).
+The recording is automated in `tools/record-demo` (see its README). To reset before re-recording:
+`curl -X POST localhost:8000/api/demo/reset` (PowerShell: `Invoke-RestMethod -Method Post localhost:8000/api/demo/reset`).
 
-### Cenário demo
+### Demo scenario
 
-Fazenda Santa Aurora, Sorriso-MT, soja, ~1.191 ha, 5 talhões, safras 2023/24, 2024/25 e 2025/26 (atual).
-Data de referência: 09/01/2026 (DAS 95).
+Santa Aurora Farm, Sorriso-MT (Brazil), soybean, ~1,191 ha, 5 fields, seasons 2023/24, 2024/25 and 2025/26 (current).
+Reference date: Jan 9, 2026 (DAS 95).
 
-- **T04 (pivô central):** queda de NDVI no setor sudoeste (~38 ha críticos) após 14 dias sem chuva.
-  Na safra 2024/25 o mesmo setor teve anomalia semelhante — a vistoria confirmou deficiência hídrica (emissores
-  entupidos), a intervenção foi registrada e o resultado medido com área de comparação.
-- **T03:** faixa com estande irregular (atenção).
-- **T01, T02, T05:** saudáveis, com variação espacial natural.
+- **F04 (center pivot):** NDVI drop in the southwest sector (~38 ha critical) after 14 days without rain.
+  In the 2024/25 season the same sector had a similar anomaly. The inspection confirmed water stress (clogged
+  sprinklers), the intervention was recorded and the outcome was measured against a comparison area.
+- **F03:** a strip with an irregular stand (watch).
+- **F01, F02, F05:** healthy, with natural spatial variation.
 
-Mapa base: Esri World Imagery (sem chave). Limites dos talhões são sintéticos e não correspondem a uma propriedade real.
+Basemap: Esri World Imagery (no key needed). Field boundaries are synthetic and do not correspond to a real property.
 
-### Configurações e Sentinel-2 (Fase 5)
+### Settings and Sentinel-2 (phase 5)
 
-- **Configurações:** premissas econômicas, limiares de risco e peso do histórico, provedor do copiloto e
-  **Reiniciar demo**. Avaliações são versionadas pelas premissas: mudar um valor gera nova versão sem quebrar tarefas e
-  resultados já criados.
-- **Sentinel-2 real:** `docker compose exec api python scripts/fetch_sentinel.py` busca no Earth Search a cena com menos
-  nuvem dos últimos 120 dias sobre a fazenda, aplica scale/offset e a máscara SCL (nuvem, sombra, cirrus), calcula
-  NDVI (B08/B04) e NDRE (B8A/B05) e gera camadas em EPSG:4326. O mapa ganha a opção **Sentinel-2 real** com data,
-  % de nuvem e pixels válidos. Os limites dos talhões continuam sintéticos — a camada demonstra o pipeline de dado real.
-  Opções: `--start AAAA-MM-DD --end AAAA-MM-DD --max-cloud 10 --bbox W S E N`.
+- **Settings:** economic assumptions, risk thresholds and history weight, copilot provider, and **Reset demo**.
+  Assessments are versioned by their assumptions, so changing a value creates a new version without breaking tasks
+  and outcomes that already exist.
+- **Real Sentinel-2:** `docker compose exec api python scripts/fetch_sentinel.py` searches Earth Search for the least
+  cloudy scene over the farm in the last 120 days. It applies scale/offset and the SCL mask (cloud, shadow, cirrus),
+  computes NDVI (B08/B04) and NDRE (B8A/B05) and writes layers in EPSG:4326. The map then offers a **Real Sentinel-2**
+  option showing the date, cloud % and valid pixels. Field boundaries remain synthetic; the layer demonstrates the
+  real-data pipeline. Options: `--start YYYY-MM-DD --end YYYY-MM-DD --max-cloud 10 --bbox W S E N`.
+  For a scene during the soybean season use a January window, e.g. `--start 2026-01-01 --end 2026-02-28`.
 
-## Fora do escopo (roadmap)
+## Out of scope (roadmap)
 
-Detecção automática de limites de talhão · georreferenciamento manual de JPEG/PNG · sincronização offline ·
-WhatsApp/voz · multi-organização e autenticação · imagens de drone · fila assíncrona (Celery/Redis).
+Automatic field-boundary detection · manual georeferencing of JPEG/PNG maps · offline sync ·
+WhatsApp/voice · multi-tenant and authentication · drone imagery · async job queue (Celery/Redis).

@@ -13,10 +13,10 @@
   --color-brand-500: #2f9e5b;
   --color-brand-600: #23824a;
   --color-brand-700: #1d683d;
-  --color-risk-verde: #22a35a;
-  --color-risk-amarelo: #f2b705;
-  --color-risk-vermelho: #e0362c;
-  --color-risk-sem_dado: #94a3b8;
+  --color-risk-green: #22a35a;
+  --color-risk-yellow: #f2b705;
+  --color-risk-red: #e0362c;
+  --color-risk-no_data: #94a3b8;
 }
 
 body {

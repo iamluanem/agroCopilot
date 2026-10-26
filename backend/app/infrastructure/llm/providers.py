@@ -1,5 +1,5 @@
-"""Provedores LLM com tool calling. O modelo só lê dados via ferramentas e termina chamando `responder`,
-cuja entrada é validada pelo schema CopilotAnswer (Pydantic)."""
+"""LLM providers with tool calling. The model only reads data through tools and finishes by calling `respond`,
+whose input is validated against the CopilotAnswer schema (Pydantic)."""
 import json
 import os
 
@@ -19,11 +19,11 @@ class ProviderError(RuntimeError):
 
 
 def _context_note(req: CopilotRequest, ctx: ToolContext) -> str:
-    note = f"Data de referência: {ctx.ref.isoformat()}. Talhões: {', '.join(f.code for f in ctx.farm.fields)}."
+    note = f"Reference date: {ctx.ref.isoformat()}. Fields: {', '.join(f.code for f in ctx.farm.fields)}."
     if req.field_id:
         f = next((x for x in ctx.farm.fields if x.id == req.field_id), None)
         if f:
-            note += f" Talhão em contexto na tela: {f.code}."
+            note += f" Field in context on screen: {f.code}."
     return note
 
 
@@ -42,9 +42,9 @@ class AnthropicProvider:
 
     def answer(self, req: CopilotRequest, ctx: ToolContext) -> tuple[CopilotAnswer, list[ToolCall]]:
         tools = [{"name": n, "description": d, "input_schema": sch} for n, (_, d, sch) in TOOLS.items()]
-        tools.append({"name": "responder", "description": "Entrega a resposta final estruturada ao usuário.",
+        tools.append({"name": "respond", "description": "Delivers the final structured answer to the user.",
                       "input_schema": RESPOND_SCHEMA})
-        msgs = _history(req) + [{"role": "user", "content": f"{_context_note(req, ctx)}\n\nPergunta: {req.question}"}]
+        msgs = _history(req) + [{"role": "user", "content": f"{_context_note(req, ctx)}\n\nQuestion: {req.question}"}]
         calls: list[ToolCall] = []
         with httpx.Client(timeout=TIMEOUT) as http:
             for step in range(MAX_STEPS):
@@ -60,19 +60,19 @@ class AnthropicProvider:
                 for block in content:
                     if block.get("type") != "tool_use":
                         continue
-                    if block["name"] == "responder":
+                    if block["name"] == "respond":
                         try:
                             return CopilotAnswer.model_validate(block["input"]), calls
                         except ValidationError as e:
                             results.append({"type": "tool_result", "tool_use_id": block["id"], "is_error": True,
-                                            "content": f"Resposta inválida para o schema: {e}"})
+                                            "content": f"Answer does not match the schema: {e}"})
                             continue
                     calls.append(ToolCall(name=block["name"], args=block["input"]))
                     out = run_tool(ctx, block["name"], block["input"])
                     results.append({"type": "tool_result", "tool_use_id": block["id"],
                                     "content": json.dumps(out, ensure_ascii=False, default=str)[:20000]})
                 msgs.append({"role": "user", "content": results})
-        raise ProviderError("O modelo não concluiu a resposta no limite de etapas.")
+        raise ProviderError("The model did not finish its answer within the step limit.")
 
 
 class OpenAIProvider:
@@ -87,10 +87,10 @@ class OpenAIProvider:
     def answer(self, req: CopilotRequest, ctx: ToolContext) -> tuple[CopilotAnswer, list[ToolCall]]:
         tools = [{"type": "function", "function": {"name": n, "description": d, "parameters": sch}}
                  for n, (_, d, sch) in TOOLS.items()]
-        tools.append({"type": "function", "function": {"name": "responder", "parameters": RESPOND_SCHEMA,
-                                                       "description": "Entrega a resposta final estruturada ao usuário."}})
+        tools.append({"type": "function", "function": {"name": "respond", "parameters": RESPOND_SCHEMA,
+                                                       "description": "Delivers the final structured answer to the user."}})
         msgs = [{"role": "system", "content": SYSTEM_PROMPT}] + _history(req) + [
-            {"role": "user", "content": f"{_context_note(req, ctx)}\n\nPergunta: {req.question}"}]
+            {"role": "user", "content": f"{_context_note(req, ctx)}\n\nQuestion: {req.question}"}]
         calls: list[ToolCall] = []
         with httpx.Client(timeout=TIMEOUT) as http:
             for step in range(MAX_STEPS):
@@ -106,14 +106,14 @@ class OpenAIProvider:
                         args = json.loads(tc["function"]["arguments"] or "{}")
                     except json.JSONDecodeError:
                         args = {}
-                    if name == "responder":
+                    if name == "respond":
                         try:
                             return CopilotAnswer.model_validate(args), calls
                         except ValidationError as e:
-                            out = {"erro": f"Resposta inválida para o schema: {e}"}
+                            out = {"error": f"Answer does not match the schema: {e}"}
                     else:
                         calls.append(ToolCall(name=name, args=args))
                         out = run_tool(ctx, name, args)
                     msgs.append({"role": "tool", "tool_call_id": tc["id"],
                                  "content": json.dumps(out, ensure_ascii=False, default=str)[:20000]})
-        raise ProviderError("O modelo não concluiu a resposta no limite de etapas.")
+        raise ProviderError("The model did not finish its answer within the step limit.")

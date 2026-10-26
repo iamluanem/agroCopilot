@@ -6,15 +6,15 @@ import { Bot, ClipboardCheck, LayoutDashboard, LineChart, Map, Menu, Settings, S
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/", label: "Visão Geral", short: "Início", icon: LayoutDashboard },
-  { href: "/mapa", label: "Mapa", short: "Mapa", icon: Map },
-  { href: "/talhoes", label: "Talhões", short: "Talhões", icon: Wheat },
-  { href: "/copiloto", label: "Copiloto", short: "Copiloto", icon: Bot },
-  { href: "/tarefas", label: "Tarefas", short: "Tarefas", icon: ClipboardCheck },
-  { href: "/resultados", label: "Resultados", short: "Resultados", icon: LineChart },
-  { href: "/configuracoes", label: "Configurações", short: "Ajustes", icon: Settings },
+  { href: "/", label: "Overview", short: "Home", icon: LayoutDashboard },
+  { href: "/map", label: "Map", short: "Map", icon: Map },
+  { href: "/fields", label: "Fields", short: "Fields", icon: Wheat },
+  { href: "/copilot", label: "Copilot", short: "Copilot", icon: Bot },
+  { href: "/tasks", label: "Tasks", short: "Tasks", icon: ClipboardCheck },
+  { href: "/outcomes", label: "Outcomes", short: "Outcomes", icon: LineChart },
+  { href: "/settings", label: "Settings", short: "Settings", icon: Settings },
 ];
-const MOBILE = ["/", "/mapa", "/tarefas", "/copiloto"];
+const MOBILE = ["/", "/map", "/tasks", "/copilot"];
 
 const isActive = (path: string, href: string) => (href === "/" ? path === "/" : path.startsWith(href));
 
@@ -24,7 +24,7 @@ function Logo() {
       <div className="grid size-8 place-items-center rounded-lg bg-brand-500 text-white"><Sprout className="size-4.5" /></div>
       <div className="leading-tight">
         <div className="text-[15px] font-semibold tracking-tight text-white">AgroCopilot</div>
-        <div className="text-[11px] text-slate-400">Copiloto operacional</div>
+        <div className="text-[11px] text-slate-400">Farm operations copilot</div>
       </div>
     </div>
   );
@@ -46,7 +46,7 @@ function NavList({ path, onNavigate }: { path: string; onNavigate?: () => void }
   );
 }
 
-const FOOT = "MVP de demonstração. Índices de satélite direcionam vistorias — não são diagnóstico.";
+const FOOT = "Demo MVP. Satellite indices direct field inspections — they are not a diagnosis.";
 
 export function AppSidebar() {
   const path = usePathname();
@@ -67,13 +67,13 @@ export function MobileNav() {
     <>
       <header className="flex items-center justify-between bg-navy-950 px-4 py-3 md:hidden">
         <Logo />
-        <button onClick={() => setOpen(true)} aria-label="Abrir menu" className="rounded-lg p-1.5 text-slate-300 hover:bg-navy-800"><Menu className="size-5" /></button>
+        <button onClick={() => setOpen(true)} aria-label="Open menu" className="rounded-lg p-1.5 text-slate-300 hover:bg-navy-800"><Menu className="size-5" /></button>
       </header>
       {open && (
         <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
-          <button aria-label="Fechar menu" className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
+          <button aria-label="Close menu" className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
           <div className="absolute inset-y-0 right-0 flex w-72 flex-col bg-navy-950 text-slate-300 shadow-xl">
-            <div className="flex items-center justify-between px-5 py-4"><Logo /><button onClick={() => setOpen(false)} aria-label="Fechar" className="rounded-lg p-1.5 hover:bg-navy-800"><X className="size-5" /></button></div>
+            <div className="flex items-center justify-between px-5 py-4"><Logo /><button onClick={() => setOpen(false)} aria-label="Close" className="rounded-lg p-1.5 hover:bg-navy-800"><X className="size-5" /></button></div>
             <NavList path={path} onNavigate={() => setOpen(false)} />
             <div className="mt-auto border-t border-navy-800 px-5 py-4 text-[11px] leading-relaxed text-slate-500">{FOOT}</div>
           </div>

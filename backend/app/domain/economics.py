@@ -1,21 +1,22 @@
-"""Modelo econômico transparente — funções puras.
+"""Transparent economic model — pure functions.
 
-Exposição estimada ≠ perda confirmada ≠ economia realizada. Tudo aqui é *estimativa* com premissas explícitas.
+Estimated exposure ≠ confirmed loss ≠ realized savings. Everything here is an *estimate* with explicit assumptions.
+Yield is expressed in 60 kg bags per hectare (the Brazilian market standard) and prices in BRL (R$).
 """
 from dataclasses import asdict, dataclass
 
-CONFIDENCE_WEIGHT = {"alta": 1.0, "moderada": 0.7, "baixa": 0.4}
-YELLOW_WEIGHT = 0.5  # célula em atenção conta como meia área afetada
+CONFIDENCE_WEIGHT = {"high": 1.0, "moderate": 0.7, "low": 0.4}
+YELLOW_WEIGHT = 0.5  # a "watch" cell counts as half an affected area
 
 
 @dataclass(frozen=True)
 class EconomicAssumptions:
-    produtividade_esperada_sc_ha: float = 62.0
-    preco_saca_rs: float = 120.0
-    perda_min_pct: float = 8.0
-    perda_max_pct: float = 25.0
-    custo_vistoria_rs: float = 450.0
-    custo_intervencao_rs_ha: float = 85.0
+    expected_yield_bags_ha: float = 62.0
+    bag_price_brl: float = 120.0
+    loss_min_pct: float = 8.0
+    loss_max_pct: float = 25.0
+    inspection_cost_brl: float = 450.0
+    intervention_cost_brl_ha: float = 85.0
 
     @classmethod
     def from_dict(cls, d: dict | None) -> "EconomicAssumptions":
@@ -26,7 +27,7 @@ class EconomicAssumptions:
 @dataclass(frozen=True)
 class Exposure:
     affected_ha: float
-    gross_value_rs: float
+    gross_value_brl: float
     exposure_min: float
     exposure_max: float
     inspection_cost: float
@@ -41,43 +42,43 @@ def affected_area(red_ha: float, yellow_ha: float) -> float:
 
 def estimate_exposure(red_ha: float, yellow_ha: float, a: EconomicAssumptions) -> Exposure:
     ha = affected_area(red_ha, yellow_ha)
-    gross = ha * a.produtividade_esperada_sc_ha * a.preco_saca_rs
+    gross = ha * a.expected_yield_bags_ha * a.bag_price_brl
     return Exposure(
         affected_ha=round(ha, 1),
-        gross_value_rs=round(gross, 2),
-        exposure_min=round(gross * a.perda_min_pct / 100, 2),
-        exposure_max=round(gross * a.perda_max_pct / 100, 2),
-        inspection_cost=round(a.custo_vistoria_rs, 2),
-        intervention_cost=round(ha * a.custo_intervencao_rs_ha, 2),
-        formula="área afetada (ha) × produtividade esperada (sc/ha) × preço (R$/sc) × faixa de perda (%). "
-                f"Área afetada = área crítica + {YELLOW_WEIGHT:.0%} da área em atenção.",
-        assumptions={**asdict(a), "peso_area_atencao": YELLOW_WEIGHT, "area_critica_ha": round(red_ha, 1),
-                     "area_atencao_ha": round(yellow_ha, 1)},
+        gross_value_brl=round(gross, 2),
+        exposure_min=round(gross * a.loss_min_pct / 100, 2),
+        exposure_max=round(gross * a.loss_max_pct / 100, 2),
+        inspection_cost=round(a.inspection_cost_brl, 2),
+        intervention_cost=round(ha * a.intervention_cost_brl_ha, 2),
+        formula="affected area (ha) × expected yield (bags/ha) × price (R$/bag) × loss range (%). "
+                f"Affected area = critical area + {YELLOW_WEIGHT:.0%} of the watch area.",
+        assumptions={**asdict(a), "watch_area_weight": YELLOW_WEIGHT, "critical_area_ha": round(red_ha, 1),
+                     "watch_area_ha": round(yellow_ha, 1)},
     )
 
 
-# ------------------------------------------------------------------ urgência e prioridade
+# ------------------------------------------------------------------ urgency and priority
 def soybean_stage(das: int) -> str:
-    """Estádio fenológico aproximado da soja por DAS (ciclo ~120 dias). Indicativo."""
-    for limit, stage in ((10, "VE"), (45, "Vegetativo (V)"), (55, "R1–R2 (florescimento)"),
-                         (70, "R3–R4 (formação de vagens)"), (85, "R5 (enchimento de grãos)"),
-                         (100, "R6 (grão cheio)"), (112, "R7 (maturação fisiológica)")):
+    """Approximate soybean growth stage by days after sowing (~120-day cycle). Indicative only."""
+    for limit, stage in ((10, "VE"), (45, "Vegetative (V)"), (55, "R1–R2 (flowering)"),
+                         (70, "R3–R4 (pod set)"), (85, "R5 (seed fill)"),
+                         (100, "R6 (full seed)"), (112, "R7 (physiological maturity)")):
         if das < limit:
             return stage
-    return "R8 (maturação plena)"
+    return "R8 (full maturity)"
 
 
 def urgency(das: int, worsening: bool) -> tuple[float, str]:
-    """0–1. Maior no período reprodutivo (R3–R6), quando estresse reduz mais a produtividade."""
+    """0–1. Highest in the reproductive period (R3–R6), when stress costs the most yield."""
     if 55 <= das < 100:
-        base, why = 1.0, "período reprodutivo — alta sensibilidade a estresse"
+        base, why = 1.0, "reproductive period — high sensitivity to stress"
     elif 40 <= das < 55 or 100 <= das < 112:
-        base, why = 0.7, "estádio de sensibilidade intermediária"
+        base, why = 0.7, "intermediate-sensitivity stage"
     else:
-        base, why = 0.4, "estádio de menor sensibilidade"
+        base, why = 0.4, "low-sensitivity stage"
     if worsening:
         base = min(1.0, base + 0.15)
-        why += "; área em anomalia crescendo nas últimas observações"
+        why += "; anomaly area growing in the latest scenes"
     return round(base, 2), why
 
 
@@ -85,5 +86,5 @@ def priority_score(exposure_mid: float, urgency_value: float, confidence: str) -
     return round(exposure_mid * urgency_value * CONFIDENCE_WEIGHT[confidence], 2)
 
 
-PRIORITY_FORMULA = ("prioridade = exposição média estimada (R$) × urgência (0–1, pelo estádio e tendência) × "
-                    "peso da confiança (alta 1,0 · moderada 0,7 · baixa 0,4)")
+PRIORITY_FORMULA = ("priority = mid estimated exposure (R$) × urgency (0–1, by crop stage and trend) × "
+                    "confidence weight (high 1.0 · moderate 0.7 · low 0.4)")

@@ -14,13 +14,13 @@ export function DateTimeline({ dates, value, onChange }: { dates: ObsDate[]; val
         </span>
         <span className="text-[11px] text-slate-500">
           {sel?.simulated ? (
-            <span className="inline-flex items-center gap-1 font-medium text-violet-700"><FlaskConical className="size-3" /> Simulação pós-intervenção (demo)</span>
+            <span className="inline-flex items-center gap-1 font-medium text-violet-700"><FlaskConical className="size-3" /> Post-intervention simulation (demo)</span>
           ) : sel && sel.cloud_pct > 0 ? (
-            <span className="inline-flex items-center gap-1 text-sky-700"><Cloud className="size-3" /> {sel.cloud_pct.toFixed(0)}% com nuvem — descartado</span>
-          ) : "Cena sem nuvem"}
+            <span className="inline-flex items-center gap-1 text-sky-700"><Cloud className="size-3" /> {sel.cloud_pct.toFixed(0)}% cloud — discarded</span>
+          ) : "Cloud-free scene"}
         </span>
       </div>
-      <div className="flex items-end gap-[3px]" role="listbox" aria-label="Datas de observação">
+      <div className="flex items-end gap-[3px]" role="listbox" aria-label="Observation dates">
         {dates.map((d, i) => {
           const active = d.date === value;
           const month = i === 0 || dates[i - 1].date.slice(5, 7) !== d.date.slice(5, 7);
@@ -29,7 +29,7 @@ export function DateTimeline({ dates, value, onChange }: { dates: ObsDate[]; val
               key={d.date}
               role="option"
               aria-selected={active}
-              title={`${fmtDate(d.date)} · DAS ${d.das}${d.cloud_pct ? ` · ${d.cloud_pct.toFixed(0)}% nuvem` : ""}`}
+              title={`${fmtDate(d.date)} · DAS ${d.das}${d.cloud_pct ? ` · ${d.cloud_pct.toFixed(0)}% cloud` : ""}`}
               onClick={() => onChange(d.date)}
               className="group flex w-5 flex-col items-center gap-1"
             >

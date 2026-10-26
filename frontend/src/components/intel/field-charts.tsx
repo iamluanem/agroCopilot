@@ -19,9 +19,9 @@ export function NdviVsBaselineChart({ d }: { d: FieldDetail }) {
         <YAxis domain={[0.2, 0.95]} tick={AXIS} tickLine={false} axisLine={false} tickFormatter={(v) => fmt(v, 1)} />
         <Tooltip {...TT} labelFormatter={(l) => fmtDate(String(l))} formatter={(v, n) => [fmt(v as number, 3), n]} />
         <Legend wrapperStyle={{ fontSize: 11 }} iconType="plainline" />
-        {firstSim && <ReferenceArea x1={firstSim} x2={d.evolution.at(-1)!.date} fill="#7c3aed" fillOpacity={0.06} label={{ value: "simulado", position: "insideTopRight", fontSize: 10, fill: "#6d28d9" }} />}
-        <Line dataKey="baseline" name="Histórico (mesmo DAS)" stroke="#94a3b8" strokeWidth={2} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
-        <Line dataKey="ndvi" name={`Safra ${d.season.name}`} stroke="#23824a" strokeWidth={2} dot={{ r: 2.5, strokeWidth: 0, fill: "#23824a" }} connectNulls isAnimationActive={false} />
+        {firstSim && <ReferenceArea x1={firstSim} x2={d.evolution.at(-1)!.date} fill="#7c3aed" fillOpacity={0.06} label={{ value: "simulated", position: "insideTopRight", fontSize: 10, fill: "#6d28d9" }} />}
+        <Line dataKey="baseline" name="History (same DAS)" stroke="#94a3b8" strokeWidth={2} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
+        <Line dataKey="ndvi" name={`Season ${d.season.name}`} stroke="#23824a" strokeWidth={2} dot={{ r: 2.5, strokeWidth: 0, fill: "#23824a" }} connectNulls isAnimationActive={false} />
       </LineChart>
     </ResponsiveContainer>
   );
@@ -36,9 +36,9 @@ export function RiskEvolutionChart({ d }: { d: FieldDetail }) {
         <YAxis tick={AXIS} tickLine={false} axisLine={false} unit=" ha" width={56} />
         <Tooltip {...TT} labelFormatter={(l) => fmtDate(String(l))} formatter={(v, n) => [`${fmt(v as number, 1)} ha`, n]} />
         <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" />
-        <Bar dataKey="vermelho" name="Crítico" stackId="a" fill={LEVEL_COLOR.vermelho} stroke="#fff" strokeWidth={1} isAnimationActive={false} />
-        <Bar dataKey="amarelo" name="Atenção" stackId="a" fill={LEVEL_COLOR.amarelo} stroke="#fff" strokeWidth={1} isAnimationActive={false} />
-        <Bar dataKey="sem_dado" name="Sem dado (nuvem)" stackId="a" fill={LEVEL_COLOR.sem_dado} stroke="#fff" strokeWidth={1} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+        <Bar dataKey="red" name="Critical" stackId="a" fill={LEVEL_COLOR.red} stroke="#fff" strokeWidth={1} isAnimationActive={false} />
+        <Bar dataKey="yellow" name="Watch" stackId="a" fill={LEVEL_COLOR.yellow} stroke="#fff" strokeWidth={1} isAnimationActive={false} />
+        <Bar dataKey="no_data" name="No data (cloud)" stackId="a" fill={LEVEL_COLOR.no_data} stroke="#fff" strokeWidth={1} radius={[3, 3, 0, 0]} isAnimationActive={false} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -54,10 +54,10 @@ export function RainChart({ d }: { d: FieldDetail }) {
         <YAxis tick={AXIS} tickLine={false} axisLine={false} unit=" mm" width={56} />
         {w?.dry_start && w.dry_end && (
           <ReferenceArea x1={w.dry_start} x2={w.dry_end} fill="#f59e0b" fillOpacity={0.12}
-            label={{ value: `${w.max_dry_days} dias sem chuva`, position: "insideTop", fontSize: 10, fill: "#b45309" }} />
+            label={{ value: `${w.max_dry_days} days without rain`, position: "insideTop", fontSize: 10, fill: "#b45309" }} />
         )}
-        <Tooltip {...TT} labelFormatter={(l) => fmtDate(String(l))} formatter={(v) => [`${fmt(v as number, 1)} mm`, "Chuva"]} />
-        <Bar dataKey="rain_mm" name="Chuva diária" fill="#3b82f6" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+        <Tooltip {...TT} labelFormatter={(l) => fmtDate(String(l))} formatter={(v) => [`${fmt(v as number, 1)} mm`, "Rain"]} />
+        <Bar dataKey="rain_mm" name="Daily rainfall" fill="#3b82f6" radius={[2, 2, 0, 0]} isAnimationActive={false} />
       </BarChart>
     </ResponsiveContainer>
   );

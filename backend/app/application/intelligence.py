@@ -1,7 +1,7 @@
-"""Avaliação de risco por talhão: zona afetada, hipóteses, exposição em R$ e prioridade.
+"""Per-field risk assessment: affected zone, hypotheses, R$ exposure and priority.
 
-As avaliações são materializadas em risk_assessments / hypotheses / economic_estimates para que tarefas,
-copiloto e relatórios referenciem o mesmo registro auditável.
+Assessments are materialized in risk_assessments / hypotheses / economic_estimates so that tasks, the copilot and
+reports all reference the same auditable record.
 """
 import hashlib
 import json
@@ -13,7 +13,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.application.map_service import NotFound, observation_dates, risk_snapshot
-from app.core.fmt import br
+from app.core.fmt import num
 from app.domain import economics as eco
 from app.domain.hypotheses import PATTERN_LABEL, ZoneContext, classify_pattern, rank_hypotheses, recommended_next_step
 from app.domain.risk import CONFIDENCE, LEVEL_CODE
@@ -24,17 +24,17 @@ from app.infrastructure.db.models import (
 )
 
 MIN_AFFECTED_HA = 1.0
-METHOD = "risco-v1 · hipoteses-regras-v1 · economia-v1"
-YELLOW, RED = LEVEL_CODE["amarelo"], LEVEL_CODE["vermelho"]
+METHOD = "risk-v1 · rule-hypotheses-v1 · economics-v1"
+YELLOW, RED = LEVEL_CODE["yellow"], LEVEL_CODE["red"]
 
 
 def get_assumptions(s: Session) -> eco.EconomicAssumptions:
-    row = s.get(AppSetting, "economia")
+    row = s.get(AppSetting, "economics")
     return eco.EconomicAssumptions.from_dict(row.value if row else None)
 
 
 def _settings_hash(s: Session) -> str:
-    rows = {r.key: r.value for r in s.scalars(select(AppSetting).where(AppSetting.key.in_(("economia", "risco"))))}
+    rows = {r.key: r.value for r in s.scalars(select(AppSetting).where(AppSetting.key.in_(("economics", "risk"))))}
     return hashlib.sha1(json.dumps(rows, sort_keys=True, default=str).encode()).hexdigest()[:12]
 
 
@@ -85,12 +85,12 @@ def _zone_mask(snap: dict, field_id: int, layout: dict) -> tuple[np.ndarray, np.
 
 
 def _onset(field_id: int, zone_ids: set[int], snaps: list[dict]) -> int | None:
-    """1º DAS a partir do qual ≥30% da zona atual aparece anômala em todas as observações válidas seguintes."""
+    """First DAS from which ≥30% of the current zone is anomalous in every subsequent valid observation."""
     fracs = []
     for sn in snaps:
         ids, lvl = sn["cells"]["id"], sn["cells"]["level"]
         z = [l for i, l in zip(ids, lvl) if i in zone_ids]
-        valid = [l for l in z if l != LEVEL_CODE["sem_dado"]]
+        valid = [l for l in z if l != LEVEL_CODE["no_data"]]
         fracs.append((sn["das"], None if len(valid) < 0.5 * len(z) else np.mean([l in (YELLOW, RED) for l in valid])))
     onset = None
     for das, f in reversed(fracs):
@@ -127,7 +127,7 @@ def _prior_verified(s: Session, field_id: int, before: date) -> list[tuple[str, 
 def assess_field(s: Session, field_id: int, on: date) -> dict:
     field = s.get(Field, field_id)
     if not field:
-        raise NotFound("Talhão não encontrado")
+        raise NotFound("Field not found")
     snap = risk_snapshot(field.farm_id, on)
     layout = _cell_layout(field.farm_id)
     fmask, zmask = _zone_mask(snap, field_id, layout)
@@ -142,13 +142,13 @@ def assess_field(s: Session, field_id: int, on: date) -> dict:
                 das=snap["das"], stage=eco.soybean_stage(snap["das"]), level=fsum["level"],
                 red_ha=round(red_ha, 1), yellow_ha=round(yellow_ha, 1), is_synthetic=True,
                 ndvi_mean=fsum["ndvi_mean"], ndvi_baseline=fsum["ndvi_baseline"])
-    if fsum["level"] == "verde" or red_ha + yellow_ha < MIN_AFFECTED_HA:
+    if fsum["level"] == "green" or red_ha + yellow_ha < MIN_AFFECTED_HA:
         return {**base, "assessment_id": None, "has_zone": False, "priority_score": 0.0,
-                "summary": f"Sem zona relevante em anomalia nesta data ({br(red_ha + yellow_ha, 1)} ha de células isoladas, dentro da variação normal).", "hypotheses": [], "economics": None}
+                "summary": f"No relevant anomaly zone on this date ({num(red_ha + yellow_ha, 1)} ha of isolated cells, within normal variation).", "hypotheses": [], "economics": None}
 
     h = _settings_hash(s)
-    # avaliações são versionadas pelas premissas: mudar Configurações gera nova versão e preserva as antigas,
-    # que continuam referenciadas por tarefas e resultados já criados
+    # assessments are versioned by assumptions: changing Settings creates a new version and keeps the old ones,
+    # which remain referenced by tasks and outcomes already created
     existing = next((r for r in s.scalars(select(RiskAssessment).where(
         RiskAssessment.field_id == field_id, RiskAssessment.date == on, RiskAssessment.cell_id.is_(None),
     ).order_by(RiskAssessment.id.desc())) if r.details.get("settings_hash") == h), None)
@@ -174,7 +174,7 @@ def assess_field(s: Session, field_id: int, on: date) -> dict:
     basel = np.asarray([np.nan if v is None else v for v in snap["cells"]["baseline"]], dtype=float)
     drop = float(np.nanmean(ndvi[zmask] - basel[zmask]))
     notes = [m.summary for m in s.scalars(select(MemoryEvent).where(
-        MemoryEvent.field_id == field_id, MemoryEvent.season_id == season.id, MemoryEvent.type == "nota"))]
+        MemoryEvent.field_id == field_id, MemoryEvent.season_id == season.id, MemoryEvent.type == "note"))]
 
     ctx = ZoneContext(
         red_ha=red_ha, yellow_ha=yellow_ha, das=snap["das"], stage=eco.soybean_stage(snap["das"]),
@@ -185,9 +185,9 @@ def assess_field(s: Session, field_id: int, on: date) -> dict:
     )
     hyps = rank_hypotheses(ctx)
 
-    # tendência: área anômala nas 2 observações válidas anteriores
+    # trend: anomalous area in the previous valid observations
     hist = [(sn["das"], next(f for f in sn["fields"] if f["field_id"] == field_id)) for sn in snaps[:-1]]
-    hist = [(d, f["area_by_level"]["vermelho"] + f["area_by_level"]["amarelo"]) for d, f in hist if f["cloud_pct"] < 30]
+    hist = [(d, f["area_by_level"]["red"] + f["area_by_level"]["yellow"]) for d, f in hist if f["cloud_pct"] < 30]
     worsening = len(hist) >= 1 and (red_ha + yellow_ha) > hist[-1][1] * 1.15 + 1
     urg, urg_why = eco.urgency(snap["das"], worsening)
 
@@ -203,8 +203,8 @@ def assess_field(s: Session, field_id: int, on: date) -> dict:
     ), {"ids": list(map(int, zone_ids))}).scalar_one()
 
     observation = (
-        f"NDVI da zona {br(abs(drop), 2)} {'abaixo' if drop < 0 else 'acima'} do histórico da própria área no mesmo "
-        f"estádio, em {br(red_ha, 1)} ha críticos e {br(yellow_ha, 1)} ha em atenção ({PATTERN_LABEL[pattern]})."
+        f"Zone NDVI {num(abs(drop), 2)} {'below' if drop < 0 else 'above'} the area's own history at the same stage, "
+        f"across {num(red_ha, 1)} critical ha and {num(yellow_ha, 1)} watch ha ({PATTERN_LABEL[pattern]})."
     )
     ra = RiskAssessment(
         field_id=field_id, cell_id=None, date=on, level=fsum["level"], anomaly_score=float(fsum["max_score"] or 0),
@@ -218,7 +218,7 @@ def assess_field(s: Session, field_id: int, on: date) -> dict:
             urgency=urg, urgency_reason=urg_why, worsening=worsening, priority_score=prio,
             priority_formula=eco.PRIORITY_FORMULA, stage=ctx.stage,
             next_step=recommended_next_step(hyps[0], red_ha),
-            prior_verified=[{"safra": a_, "causa": c} for a_, c in ctx.prior_verified],
+            prior_verified=[{"season": a_, "cause": c} for a_, c in ctx.prior_verified],
         ),
     )
     s.add(ra)
@@ -229,7 +229,7 @@ def assess_field(s: Session, field_id: int, on: date) -> dict:
     s.add(EconomicEstimate(
         assessment_id=ra.id, affected_ha=exp.affected_ha, exposure_min=exp.exposure_min, exposure_max=exp.exposure_max,
         inspection_cost=exp.inspection_cost, intervention_cost=exp.intervention_cost,
-        assumptions={**exp.assumptions, "formula": exp.formula, "gross_value_rs": exp.gross_value_rs,
+        assumptions={**exp.assumptions, "formula": exp.formula, "gross_value_brl": exp.gross_value_brl,
                      "hypothesis_scores": {hy.key: round(hy.score, 2) for hy in hyps}},
     ))
     s.commit()
@@ -249,15 +249,15 @@ def _to_dict(s: Session, ra: RiskAssessment, base: dict) -> dict:
         "recurrence_share": d["recurrence_share"], "weather": d["weather"], "urgency": d["urgency"],
         "urgency_reason": d["urgency_reason"], "worsening": d["worsening"], "priority_score": d["priority_score"],
         "priority_formula": d["priority_formula"], "next_step": d["next_step"], "prior_verified": d["prior_verified"],
-        "disclaimer": "Hipóteses derivadas de índice de vegetação e contexto. Não são diagnóstico: confirmar em vistoria. "
-                      "Sem vistoria, a confiança máxima é moderada.",
+        "disclaimer": "Hypotheses derived from a vegetation index and context. Not a diagnosis: confirm with an "
+                      "inspection. Without an inspection, the maximum confidence is moderate.",
         "hypotheses": [dict(rank=h.rank, cause=h.cause, confidence=h.confidence, evidence=h.supporting_evidence,
                             missing=h.missing_data) for h in ra.hypotheses],
         "economics": dict(
             affected_ha=est.affected_ha, exposure_min=est.exposure_min, exposure_max=est.exposure_max,
             inspection_cost=est.inspection_cost, intervention_cost=est.intervention_cost,
-            gross_value_rs=a.pop("gross_value_rs"), formula=a.pop("formula"), assumptions=a,
-            label="Exposição estimada (não é perda confirmada)",
+            gross_value_brl=a.pop("gross_value_brl"), formula=a.pop("formula"), assumptions=a,
+            label="Estimated exposure (not a confirmed loss)",
         ),
     }
 
@@ -265,7 +265,7 @@ def _to_dict(s: Session, ra: RiskAssessment, base: dict) -> dict:
 def priorities(s: Session, farm_id: int, on: date) -> dict:
     fields = s.scalars(select(Field).where(Field.farm_id == farm_id).order_by(Field.code)).all()
     if not fields:
-        raise NotFound("Fazenda sem talhões")
+        raise NotFound("Farm has no fields")
     items = [assess_field(s, f.id, on) for f in fields]
     items.sort(key=lambda x: x["priority_score"], reverse=True)
     for i, it in enumerate(items, 1):
@@ -282,20 +282,20 @@ def priorities(s: Session, farm_id: int, on: date) -> dict:
     )
 
 
-# ------------------------------------------------------------------ talhão: histórico e memória
+# ------------------------------------------------------------------ field: history and memory
 def field_detail(s: Session, field_id: int, on: date | None) -> dict:
     field = s.get(Field, field_id)
     if not field:
-        raise NotFound("Talhão não encontrado")
+        raise NotFound("Field not found")
     season = s.scalars(select(CropSeason).where(CropSeason.farm_id == field.farm_id, CropSeason.is_current.is_(True))).one()
     on = on or field.farm.reference_date
-    snaps = _season_snapshots(s, field.farm_id, season.id)  # inclui observações simuladas pós-intervenção
+    snaps = _season_snapshots(s, field.farm_id, season.id)  # includes simulated post-intervention observations
     evolution = []
     for sn in snaps:
         f = next(x for x in sn["fields"] if x["field_id"] == field_id)
         evolution.append(dict(date=sn["date"], das=sn["das"], cloud_pct=f["cloud_pct"], simulated=sn["simulated"],
-                              vermelho=f["area_by_level"]["vermelho"], amarelo=f["area_by_level"]["amarelo"],
-                              sem_dado=f["area_by_level"]["sem_dado"], ndvi=f["ndvi_mean"], baseline=f["ndvi_baseline"]))
+                              red=f["area_by_level"]["red"], yellow=f["area_by_level"]["yellow"],
+                              no_data=f["area_by_level"]["no_data"], ndvi=f["ndvi_mean"], baseline=f["ndvi_baseline"]))
     rain = s.execute(select(WeatherDaily.date, WeatherDaily.rain_mm, WeatherDaily.tmax_c).where(
         WeatherDaily.farm_id == field.farm_id, WeatherDaily.date >= season.sowing_date, WeatherDaily.date <= on,
     ).order_by(WeatherDaily.date)).all()
@@ -303,12 +303,12 @@ def field_detail(s: Session, field_id: int, on: date | None) -> dict:
         field_id=field.id, code=field.code, name=field.name, area_ha=field.area_ha, soil_texture=field.soil_texture,
         irrigation=field.irrigation, boundary_source=field.boundary_source, is_synthetic=True,
         season=dict(id=season.id, name=season.name, sowing_date=season.sowing_date,
-                    expected_yield_sc_ha=season.expected_yield_sc_ha),
+                    expected_yield_bags_ha=season.expected_yield_bags_ha),
         date=on, assessment=assess_field(s, field_id, on), evolution=evolution,
         weather=[dict(date=r.date, rain_mm=r.rain_mm, tmax_c=r.tmax_c) for r in rain],
         memory=memory(s, field_id),
-        harvests=[dict(season=c.name, expected=c.expected_yield_sc_ha, realized=c.realized_yield_sc_ha)
-                  for c in field.farm.seasons if c.realized_yield_sc_ha is not None],
+        harvests=[dict(season=c.name, expected=c.expected_yield_bags_ha, realized=c.realized_yield_bags_ha)
+                  for c in field.farm.seasons if c.realized_yield_bags_ha is not None],
     )
 
 
@@ -332,7 +332,7 @@ def weather(s: Session, farm_id: int, start: date, end: date) -> list[dict]:
 
 
 def warm_cache(farm_id: int | None = None) -> None:
-    """Pré-calcula snapshots e avaliações da data de referência (chamado no startup)."""
+    """Precompute snapshots and assessments for the reference date (called at startup)."""
     from app.infrastructure.db.models import Farm
     with SessionLocal() as s:
         farm = s.get(Farm, farm_id) if farm_id else s.scalars(select(Farm)).first()

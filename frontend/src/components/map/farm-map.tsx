@@ -8,7 +8,7 @@ import type { Basemap, FieldProps, Level, LayerMode, RiskSnapshot } from "@/lib/
 import { fmt } from "@/lib/utils";
 
 const TRANSPARENT = "rgba(0,0,0,0)";
-const LEVEL_KEYS: Level[] = ["verde", "amarelo", "vermelho", "sem_dado"];
+const LEVEL_KEYS: Level[] = ["green", "yellow", "red", "no_data"];
 
 type FieldsFC = GeoJSON.FeatureCollection<GeoJSON.Polygon, FieldProps>;
 
@@ -33,21 +33,21 @@ const levelExpr = ["coalesce", ["feature-state", "level"], -1] as ExpressionSpec
 
 function fillColor(mode: LayerMode): ExpressionSpecification | string {
   if (mode === "sentinel") return TRANSPARENT;
-  if (mode === "risco") {
-    return ["match", levelExpr, 0, LEVEL_COLOR.verde, 1, LEVEL_COLOR.amarelo, 2, LEVEL_COLOR.vermelho, 3, LEVEL_COLOR.sem_dado, TRANSPARENT];
+  if (mode === "risk") {
+    return ["match", levelExpr, 0, LEVEL_COLOR.green, 1, LEVEL_COLOR.yellow, 2, LEVEL_COLOR.red, 3, LEVEL_COLOR.no_data, TRANSPARENT];
   }
   const ramp = INDEX_RAMP[mode].flatMap(([v, c]) => [v, c]);
   return [
     "case",
     ["==", ["typeof", ["feature-state", mode]], "number"],
     ["interpolate", ["linear"], ["feature-state", mode], ...ramp] as ExpressionSpecification,
-    LEVEL_COLOR.sem_dado,
+    LEVEL_COLOR.no_data,
   ];
 }
 
 function fillOpacity(mode: LayerMode, o: number): ExpressionSpecification | number {
   if (mode === "sentinel") return 0;
-  if (mode !== "risco") return o * 0.9;
+  if (mode !== "risk") return o * 0.9;
   return ["*", o, ["match", levelExpr, 0, 0.42, 1, 0.85, 2, 0.92, 3, 0.55, 0]];
 }
 
@@ -66,7 +66,7 @@ export function FarmMap(p: Props) {
   const [cellsReady, setCellsReady] = useState(false);
   const cellsReadyRef = useRef(false);
 
-  // inicialização
+  // init
   useEffect(() => {
     if (!container.current) return;
     const map = new maplibregl.Map({
@@ -78,32 +78,37 @@ export function FarmMap(p: Props) {
       style: {
         version: 8,
         sources: {
-          satelite: {
+          satellite: {
             type: "raster", tileSize: 256, maxzoom: 18,
             tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-            attribution: "Imagem base: Esri, Maxar, Earthstar Geographics",
+            attribution: "Basemap: Esri, Maxar, Earthstar Geographics",
           },
-          terreno: {
+          terrain: {
             type: "raster", tileSize: 256, maxzoom: 18,
             tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"],
             attribution: "Esri, HERE, Garmin, OpenStreetMap",
           },
         },
         layers: [
-          { id: "satelite", type: "raster", source: "satelite" },
-          { id: "terreno", type: "raster", source: "terreno", layout: { visibility: "none" } },
+          { id: "satellite", type: "raster", source: "satellite" },
+          { id: "terrain", type: "raster", source: "terrain", layout: { visibility: "none" } },
         ],
       },
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "bottom-right");
     map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
     mapRef.current = map;
+    (window as unknown as { __agroMap?: maplibregl.Map }).__agroMap = map; // used by tools/record-demo
 
-    map.on("load", () => {
+    // "style.load" does not wait for basemap tiles: the map works even if the satellite provider is slow
+    let ready = false;
+    const setup = () => {
+      if (ready) return;
+      ready = true;
       map.addSource("fields", { type: "geojson", data: cb.current.fields });
       map.addSource("cells", { type: "geojson", data: api.cellsUrl(p.farmId) });
 
-      map.addLayer({ id: "cells-fill", type: "fill", source: "cells", paint: { "fill-color": fillColor("risco"), "fill-opacity": fillOpacity("risco", 0.8) } });
+      map.addLayer({ id: "cells-fill", type: "fill", source: "cells", paint: { "fill-color": fillColor("risk"), "fill-opacity": fillOpacity("risk", 0.8) } });
       map.addLayer({
         id: "cells-grid", type: "line", source: "cells", minzoom: 15.5,
         paint: { "line-color": "#ffffff", "line-opacity": 0.18, "line-width": 0.5 },
@@ -124,13 +129,15 @@ export function FarmMap(p: Props) {
         el.className = "flex items-center gap-1.5 rounded-full bg-navy-950/85 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg ring-1 ring-white/20 backdrop-blur hover:bg-navy-800";
         const dot = document.createElement("span");
         dot.className = "size-2 rounded-full";
-        dot.style.background = LEVEL_COLOR.sem_dado;
+        dot.style.background = LEVEL_COLOR.no_data;
         el.append(dot, document.createTextNode(f.properties.code));
         el.addEventListener("click", (e) => { e.stopPropagation(); cb.current.onSelectField(f.properties.id); });
         const marker = new maplibregl.Marker({ element: el }).setLngLat(f.properties.label_point).addTo(map);
         markers.current.set(f.properties.id, { marker, dot });
       });
-    });
+    };
+    if (map.isStyleLoaded()) setup();
+    else map.once("style.load", setup);
 
     map.on("sourcedata", (e: MapSourceDataEvent) => {
       if (e.sourceId === "cells" && e.isSourceLoaded && !cellsReadyRef.current) {
@@ -146,14 +153,14 @@ export function FarmMap(p: Props) {
       map.getCanvas().style.cursor = "pointer";
       const st = map.getFeatureState({ source: "cells", id: f.id! });
       const field = cb.current.fields.features.find((x) => x.properties.id === f.properties.f);
-      const lvl = LEVEL_KEYS[st.level as number] ?? "sem_dado";
+      const lvl = LEVEL_KEYS[st.level as number] ?? "no_data";
       popup.setLngLat(e.lngLat).setHTML(
         `<div style="padding:8px 10px;font:12px var(--font-geist-sans)">
           <div style="display:flex;align-items:center;gap:6px;font-weight:600">
             <span style="width:8px;height:8px;border-radius:9px;background:${LEVEL_COLOR[lvl]}"></span>
             ${field?.properties.name ?? ""} · ${LEVEL_LABEL[lvl]}
           </div>
-          <div style="color:#475569;margin-top:2px">NDVI ${fmt(st.ndvi as number, 2)} · histórico ${fmt(st.baseline as number, 2)}</div>
+          <div style="color:#475569;margin-top:2px">NDVI ${fmt(st.ndvi as number, 2)} · history ${fmt(st.baseline as number, 2)}</div>
         </div>`,
       ).addTo(map);
     });
@@ -178,7 +185,7 @@ export function FarmMap(p: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.farmId]);
 
-  // estado de risco por célula
+  // per-cell risk state
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !cellsReady || !p.risk) return;
@@ -195,7 +202,7 @@ export function FarmMap(p: Props) {
     });
   }, [p.risk, cellsReady]);
 
-  // modo de camada + opacidade
+  // layer mode + opacity
   useEffect(() => {
     const map = mapRef.current;
     if (!map?.getLayer("cells-fill")) return;
@@ -203,7 +210,7 @@ export function FarmMap(p: Props) {
     map.setPaintProperty("cells-fill", "fill-opacity", fillOpacity(p.mode, p.opacity));
   }, [p.mode, p.opacity, cellsReady]);
 
-  // camada Sentinel-2 real (imagem processada por scripts/fetch_sentinel.py)
+  // real Sentinel-2 layer (image processed by scripts/fetch_sentinel.py)
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !cellsReady) return;
@@ -225,15 +232,15 @@ export function FarmMap(p: Props) {
     map.setPaintProperty("sentinel", "raster-opacity", p.opacity);
   }, [p.mode, p.opacity, p.sentinel?.url]);
 
-  // mapa base
+  // basemap
   useEffect(() => {
     const map = mapRef.current;
-    if (!map?.getLayer("satelite")) return;
-    map.setLayoutProperty("satelite", "visibility", p.basemap === "satelite" ? "visible" : "none");
-    map.setLayoutProperty("terreno", "visibility", p.basemap === "terreno" ? "visible" : "none");
+    if (!map?.getLayer("satellite")) return;
+    map.setLayoutProperty("satellite", "visibility", p.basemap === "satellite" ? "visible" : "none");
+    map.setLayoutProperty("terrain", "visibility", p.basemap === "terrain" ? "visible" : "none");
   }, [p.basemap, cellsReady]);
 
-  // filtro de talhões
+  // field filter
   useEffect(() => {
     const map = mapRef.current;
     if (!map?.getLayer("cells-fill")) return;
@@ -245,7 +252,7 @@ export function FarmMap(p: Props) {
     });
   }, [p.visibleFieldIds, cellsReady]);
 
-  // seleção
+  // selection
   useEffect(() => {
     const map = mapRef.current;
     if (!map?.getLayer("field-selected")) return;
@@ -253,7 +260,7 @@ export function FarmMap(p: Props) {
     map.setFilter("cell-selected", ["==", ["id"], p.selectedCellId ?? -1]);
   }, [p.selectedFieldId, p.selectedCellId, cellsReady]);
 
-  // enquadrar talhão selecionado (quando não veio de clique numa célula)
+  // fit the selected field (when it did not come from a cell click)
   const lastFlown = useRef<number | null>(null);
   useEffect(() => {
     const map = mapRef.current;
@@ -266,8 +273,8 @@ export function FarmMap(p: Props) {
     if (p.selectedCellId != null || lastFlown.current === p.selectedFieldId) return;
     const f = p.fields.features.find((x) => x.properties.id === p.selectedFieldId);
     const fly = () => f && map.fitBounds(fieldBounds(f), { padding: { top: 100, bottom: 130, left: 60, right: 60 }, duration: 900 });
-    if (map.loaded()) fly();
-    else map.once("load", fly);
+    if (map.isStyleLoaded()) fly();
+    else map.once("style.load", fly);
     lastFlown.current = p.selectedFieldId;
   }, [p.selectedFieldId, p.selectedCellId, p.fields, p.bbox]);
 
@@ -282,7 +289,7 @@ export function FarmMap(p: Props) {
       <div ref={container} className="h-full w-full" />
       {!cellsReady && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center">
-          <div className="rounded-lg bg-white/90 px-3 py-2 text-xs text-slate-600 shadow">Carregando células de manejo…</div>
+          <div className="rounded-lg bg-white/90 px-3 py-2 text-xs text-slate-600 shadow">Loading management cells…</div>
         </div>
       )}
     </div>
