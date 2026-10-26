@@ -62,6 +62,10 @@ export function MapWorkspace() {
     placeholderData: keepPreviousData,
   });
 
+  const imagery = useQuery({ queryKey: ["imagery", farmId], queryFn: () => api.imagery(farmId!), enabled: !!farmId });
+  const scene = imagery.data?.[0];
+  const sentinel = useMemo(() => (scene ? { url: api.mediaUrl(scene.files.ndvi), bounds: scene.bounds } : null), [scene]);
+
   const cellIndex = useMemo(() => {
     const m = new Map<number, number>();
     risk.data?.cells.id.forEach((id, i) => m.set(id, i));
@@ -92,8 +96,8 @@ export function MapWorkspace() {
   const fieldRisk = risk.data?.fields.find((f) => f.field_id === selField);
 
   return (
-    <div className="flex min-h-0 flex-1">
-      <section className="relative min-w-0 flex-1">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-visible">
+      <section className="relative min-h-[60vh] min-w-0 shrink-0 md:min-h-0 md:flex-1 md:shrink">
         <FarmMap
           farmId={farm.data.id}
           bbox={farm.data.bbox}
@@ -108,6 +112,7 @@ export function MapWorkspace() {
           onSelectCell={(c, f) => { setSelCell(c); setSelField(f); }}
           onSelectField={(f) => { setSelField(f); setSelCell(null); }}
           onClear={() => { setSelCell(null); setSelField(null); }}
+          sentinel={sentinel}
         />
 
         {/* barra superior */}
@@ -122,7 +127,8 @@ export function MapWorkspace() {
               {farm.data.seasons.map((s) => <option key={s.id} value={s.id}>Safra {s.name}{s.is_current ? " (atual)" : ""}</option>)}
             </select>
             <span className="h-5 w-px bg-slate-200" />
-            <Segmented value={mode} onChange={setMode} options={[{ value: "risco", label: "Risco" }, { value: "ndvi", label: "NDVI" }, { value: "ndre", label: "NDRE" }]} />
+            <Segmented value={mode} onChange={setMode} options={[{ value: "risco", label: "Risco" }, { value: "ndvi", label: "NDVI" }, { value: "ndre", label: "NDRE" },
+              ...(scene ? [{ value: "sentinel" as LayerMode, label: "Sentinel-2 real" }] : [])]} />
             <Segmented value={basemap} onChange={setBasemap} options={[{ value: "satelite", label: "Satélite" }, { value: "terreno", label: "Terreno" }]} />
             <label className="flex items-center gap-2 px-1 text-[11px] text-slate-500">
               Opacidade
@@ -152,9 +158,9 @@ export function MapWorkspace() {
           </div>
         </div>
 
-        <div className="pointer-events-none absolute bottom-8 left-3 flex flex-col gap-2">
-          <DemoBadge className="pointer-events-auto self-start bg-white shadow" label="Dados de demonstração" />
-          <div className="pointer-events-auto"><MapLegend mode={mode} /></div>
+        <div className="pointer-events-none absolute bottom-24 left-3 flex flex-col gap-2 md:bottom-8">
+          {mode !== "sentinel" && <DemoBadge className="pointer-events-auto self-start bg-white shadow" label="Dados de demonstração" />}
+          <div className="pointer-events-auto hidden md:block"><MapLegend mode={mode} scene={scene} /></div>
         </div>
         {(
           <div className={cn("absolute inset-y-3 right-3 z-10 w-[420px] max-w-[calc(100%-1.5rem)]", chatOpen ? "flex" : "hidden")}>
@@ -167,8 +173,8 @@ export function MapWorkspace() {
           </div>
           </div>
         )}
-        {dates.data && (
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
+        {dates.data && mode !== "sentinel" && (
+          <div className="absolute bottom-3 left-1/2 max-w-[calc(100%-1.5rem)] -translate-x-1/2 overflow-x-auto rounded-xl md:bottom-8">
             <DateTimeline dates={dates.data} value={date} onChange={(d) => setDate(d)} />
           </div>
         )}

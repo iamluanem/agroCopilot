@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from functools import lru_cache
 
 import numpy as np
-from sqlalchemy import delete, select, text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.application.map_service import NotFound, observation_dates, risk_snapshot
@@ -34,7 +34,7 @@ def get_assumptions(s: Session) -> eco.EconomicAssumptions:
 
 
 def _settings_hash(s: Session) -> str:
-    rows = {r.key: r.value for r in s.scalars(select(AppSetting))}
+    rows = {r.key: r.value for r in s.scalars(select(AppSetting).where(AppSetting.key.in_(("economia", "risco"))))}
     return hashlib.sha1(json.dumps(rows, sort_keys=True, default=str).encode()).hexdigest()[:12]
 
 
@@ -147,13 +147,13 @@ def assess_field(s: Session, field_id: int, on: date) -> dict:
                 "summary": f"Sem zona relevante em anomalia nesta data ({br(red_ha + yellow_ha, 1)} ha de células isoladas, dentro da variação normal).", "hypotheses": [], "economics": None}
 
     h = _settings_hash(s)
-    existing = s.scalars(select(RiskAssessment).where(
+    # avaliações são versionadas pelas premissas: mudar Configurações gera nova versão e preserva as antigas,
+    # que continuam referenciadas por tarefas e resultados já criados
+    existing = next((r for r in s.scalars(select(RiskAssessment).where(
         RiskAssessment.field_id == field_id, RiskAssessment.date == on, RiskAssessment.cell_id.is_(None),
-    )).first()
-    if existing and existing.details.get("settings_hash") == h:
-        return _to_dict(s, existing, base)
+    ).order_by(RiskAssessment.id.desc())) if r.details.get("settings_hash") == h), None)
     if existing:
-        s.execute(delete(RiskAssessment).where(RiskAssessment.id == existing.id))
+        return _to_dict(s, existing, base)
 
     season = s.get(CropSeason, snap["season_id"])
     ids = np.asarray(snap["cells"]["id"])

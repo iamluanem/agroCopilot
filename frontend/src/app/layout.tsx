@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { AppSidebar } from "@/components/app-sidebar";
+import { AppSidebar, MobileNav } from "@/components/app-sidebar";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -15,9 +15,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="pt-BR" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body>
         <Providers>
-          <div className="flex h-dvh overflow-hidden">
+          <div className="flex h-dvh flex-col overflow-hidden md:flex-row">
             <AppSidebar />
-            <main className="flex min-w-0 flex-1 flex-col">{children}</main>
+            <MobileNav />
+            <main className="flex min-h-0 min-w-0 flex-1 flex-col pb-14 md:pb-0">{children}</main>
           </div>
         </Providers>
       </body>

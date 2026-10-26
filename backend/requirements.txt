@@ -10,3 +10,6 @@ shapely==2.2.0
 pyproj==3.8.0
 numpy==2.5.4
 httpx==0.28.1
+rasterio==1.5.2
+pystac-client==0.9.1
+pillow==13.0.0

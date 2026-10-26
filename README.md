@@ -23,7 +23,7 @@ hipótese (com confiança) e achado verificado em campo, e constrói uma memóri
 | 2 · Inteligência | Hipóteses com evidência e dado faltante, exposição em R$, priorização, telas **Visão Geral** e **Talhão** | ✅ |
 | 3 · Copiloto | Chat com cards estruturados, 10 ferramentas sobre dados reais, `DemoProvider` + Claude/OpenAI, vistoria com confirmação | ✅ |
 | 4 · Loop operacional | **Tarefas** (execução mobile com foto e rascunho offline), verificação do agrônomo, intervenção, simulação pós-intervenção, **Resultados**, memória | ✅ |
-| 5 · Polimento | Configurações, script Sentinel-2, testes, UI para gravação | ⏳ |
+| 5 · Polimento | **Configurações** editáveis com recálculo, reinício da demo, **Sentinel-2 real** no mapa, navegação mobile | ✅ |
 
 ## Como rodar
 
@@ -75,19 +75,24 @@ cd frontend && npm install && npm run dev
 ```mermaid
 flowchart LR
   subgraph web["frontend · Next.js"]
-    MAP[Mapa · MapLibre GL]
-    PANEL[Painel do talhão/célula · Recharts]
+    UI[Visão Geral · Mapa · Talhões<br/>Copiloto · Tarefas · Resultados · Configurações]
   end
   subgraph api["backend · FastAPI"]
-    R[api/routers] --> A[application<br/>casos de uso]
-    A --> D[domain<br/>motor de risco puro]
-    A --> I[infrastructure<br/>SQLAlchemy · GeoAlchemy2]
-    S[seed determinístico] --> I
+    R[api/routers] --> A[application<br/>risco · inteligência · copiloto · operação]
+    A --> D[domain<br/>risco · hipóteses · economia · contrato do copiloto]
+    A --> I[infrastructure<br/>SQLAlchemy/PostGIS · LLM providers · seed]
+    T[copilot_tools] --> A
   end
-  DB[(PostgreSQL 16<br/>+ PostGIS)]
-  MAP -- GeoJSON + snapshot de risco --> R
-  PANEL --> R
+  LLM[(Claude / OpenAI<br/>opcional)]
+  S2[(Earth Search STAC<br/>Sentinel-2 L2A)]
+  DB[(PostgreSQL 16 + PostGIS)]
+  M[(volume media<br/>fotos · camadas S2)]
+  UI -->|REST/JSON| R
   I --> DB
+  I -.tool calling.-> LLM
+  SC[scripts/fetch_sentinel.py] --> S2
+  SC --> M
+  R --> M
 ```
 
 ```
@@ -182,6 +187,17 @@ Data de referência: 09/01/2026 (DAS 95).
 - **T01, T02, T05:** saudáveis, com variação espacial natural.
 
 Mapa base: Esri World Imagery (sem chave). Limites dos talhões são sintéticos e não correspondem a uma propriedade real.
+
+### Configurações e Sentinel-2 (Fase 5)
+
+- **Configurações:** premissas econômicas, limiares de risco e peso do histórico, provedor do copiloto e
+  **Reiniciar demo**. Avaliações são versionadas pelas premissas: mudar um valor gera nova versão sem quebrar tarefas e
+  resultados já criados.
+- **Sentinel-2 real:** `docker compose exec api python scripts/fetch_sentinel.py` busca no Earth Search a cena com menos
+  nuvem dos últimos 120 dias sobre a fazenda, aplica scale/offset e a máscara SCL (nuvem, sombra, cirrus), calcula
+  NDVI (B08/B04) e NDRE (B8A/B05) e gera camadas em EPSG:4326. O mapa ganha a opção **Sentinel-2 real** com data,
+  % de nuvem e pixels válidos. Os limites dos talhões continuam sintéticos — a camada demonstra o pipeline de dado real.
+  Opções: `--start AAAA-MM-DD --end AAAA-MM-DD --max-cloud 10 --bbox W S E N`.
 
 ## Fora do escopo (roadmap)
 

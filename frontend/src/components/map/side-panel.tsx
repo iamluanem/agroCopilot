@@ -38,7 +38,7 @@ interface Props {
 
 export function SidePanel(p: Props) {
   return (
-    <aside className="flex w-[380px] shrink-0 flex-col overflow-y-auto border-l border-slate-200 bg-white">
+    <aside className="flex w-full shrink-0 flex-col border-t border-slate-200 bg-white md:w-[380px] md:overflow-y-auto md:border-l md:border-t-0">
       {p.riskError ? <ErrorState error={p.riskError} /> : null}
       {p.fieldProps ? <FieldView {...p} fieldProps={p.fieldProps} /> : <FarmView {...p} />}
     </aside>

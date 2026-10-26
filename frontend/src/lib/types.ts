@@ -102,7 +102,7 @@ export interface FieldSeries {
   }[];
 }
 
-export type LayerMode = "risco" | "ndvi" | "ndre";
+export type LayerMode = "risco" | "ndvi" | "ndre" | "sentinel";
 export type Basemap = "satelite" | "terreno";
 
 export interface HypothesisT {
@@ -342,4 +342,39 @@ export interface OutcomeDetail {
   before_date: string;
   after_date: string;
   disclaimer: string;
+}
+
+export interface EconomiaCfg {
+  produtividade_esperada_sc_ha: number;
+  preco_saca_rs: number;
+  perda_min_pct: number;
+  perda_max_pct: number;
+  custo_vistoria_rs: number;
+  custo_intervencao_rs_ha: number;
+}
+export interface RiscoCfg {
+  limiar_amarelo: number;
+  limiar_vermelho: number;
+  peso_historico: number;
+}
+export type ProviderChoice = "auto" | "demo" | "anthropic" | "openai";
+export interface SettingsT {
+  economia: EconomiaCfg;
+  risco: RiscoCfg;
+  llm_provider: ProviderChoice;
+  copilot: CopilotStatus;
+}
+
+export interface SentinelScene {
+  scene_id: string;
+  date: string;
+  datetime: string;
+  cloud_cover: number | null;
+  bounds: [number, number, number, number];
+  files: { ndvi: string; ndre: string };
+  valid_pct: number;
+  ndvi_mean: number | null;
+  ndre_mean: number | null;
+  source: string;
+  stac_item?: string;
 }

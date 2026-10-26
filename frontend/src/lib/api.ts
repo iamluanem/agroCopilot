@@ -1,4 +1,4 @@
-import type { Assessment, CopilotResponse, CopilotStatus, InterventionT, OutcomeDetail, OutcomeListItem, TaskDetail, TaskProposal, TaskStatus, TaskT, Farm, FieldDetail, FieldSeries, ObsDate, Priorities, RiskSnapshot } from "./types";
+import type { SentinelScene, SettingsT, EconomiaCfg, RiscoCfg, ProviderChoice, Assessment, CopilotResponse, CopilotStatus, InterventionT, OutcomeDetail, OutcomeListItem, TaskDetail, TaskProposal, TaskStatus, TaskT, Farm, FieldDetail, FieldSeries, ObsDate, Priorities, RiskSnapshot } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -54,6 +54,9 @@ export const api = {
   outcome: (id: number) => get<OutcomeDetail>(`/api/outcomes/${id}`),
   resetDemo: () => send<{ tarefas_removidas: number }>("POST", "/api/demo/reset"),
   mediaUrl: (path: string) => `${API_URL}${path}`,
+  settings: () => get<SettingsT>("/api/settings"),
+  saveSettings: (b: { economia: EconomiaCfg; risco: RiscoCfg; llm_provider: ProviderChoice }) => send<SettingsT>("PUT", "/api/settings", b),
+  imagery: (farmId: number) => get<SentinelScene[]>(`/api/farms/${farmId}/imagery`),
   fieldsUrl: (id: number) => `${API_URL}/api/farms/${id}/fields.geojson`,
   cellsUrl: (id: number) => `${API_URL}/api/farms/${id}/cells.geojson`,
 };

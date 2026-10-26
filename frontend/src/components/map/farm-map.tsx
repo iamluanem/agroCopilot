@@ -26,11 +26,13 @@ interface Props {
   onSelectCell: (cellId: number, fieldId: number) => void;
   onSelectField: (fieldId: number) => void;
   onClear: () => void;
+  sentinel?: { url: string; bounds: [number, number, number, number] } | null;
 }
 
 const levelExpr = ["coalesce", ["feature-state", "level"], -1] as ExpressionSpecification;
 
-function fillColor(mode: LayerMode): ExpressionSpecification {
+function fillColor(mode: LayerMode): ExpressionSpecification | string {
+  if (mode === "sentinel") return TRANSPARENT;
   if (mode === "risco") {
     return ["match", levelExpr, 0, LEVEL_COLOR.verde, 1, LEVEL_COLOR.amarelo, 2, LEVEL_COLOR.vermelho, 3, LEVEL_COLOR.sem_dado, TRANSPARENT];
   }
@@ -44,6 +46,7 @@ function fillColor(mode: LayerMode): ExpressionSpecification {
 }
 
 function fillOpacity(mode: LayerMode, o: number): ExpressionSpecification | number {
+  if (mode === "sentinel") return 0;
   if (mode !== "risco") return o * 0.9;
   return ["*", o, ["match", levelExpr, 0, 0.42, 1, 0.85, 2, 0.92, 3, 0.55, 0]];
 }
@@ -199,6 +202,28 @@ export function FarmMap(p: Props) {
     map.setPaintProperty("cells-fill", "fill-color", fillColor(p.mode));
     map.setPaintProperty("cells-fill", "fill-opacity", fillOpacity(p.mode, p.opacity));
   }, [p.mode, p.opacity, cellsReady]);
+
+  // camada Sentinel-2 real (imagem processada por scripts/fetch_sentinel.py)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !cellsReady) return;
+    const s = p.sentinel;
+    if (map.getLayer("sentinel")) map.removeLayer("sentinel");
+    if (map.getSource("sentinel")) map.removeSource("sentinel");
+    if (!s) return;
+    const [w, so, e, n] = s.bounds;
+    map.addSource("sentinel", { type: "image", url: s.url, coordinates: [[w, n], [e, n], [e, so], [w, so]] });
+    map.addLayer({ id: "sentinel", type: "raster", source: "sentinel", paint: { "raster-opacity": p.opacity, "raster-resampling": "nearest" },
+      layout: { visibility: p.mode === "sentinel" ? "visible" : "none" } }, "cells-fill");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.sentinel?.url, cellsReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.getLayer("sentinel")) return;
+    map.setLayoutProperty("sentinel", "visibility", p.mode === "sentinel" ? "visible" : "none");
+    map.setPaintProperty("sentinel", "raster-opacity", p.opacity);
+  }, [p.mode, p.opacity, p.sentinel?.url]);
 
   // mapa base
   useEffect(() => {
